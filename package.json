@@ -1,0 +1,42 @@
+{
+  "name": "clash",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:api": "tsx watch src/server/index.ts",
+    "start:api": "tsx src/server/index.ts",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@somnia-chain/markets-sdk": "^0.28.1",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "7.18.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.1",
+    "@vitejs/plugin-react": "^6.0.4",
+    "concurrently": "^10.0.5",
+    "oxlint": "^1.75.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
+  }
+}
