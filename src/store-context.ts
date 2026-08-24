@@ -1,9 +1,11 @@
 import {createContext,useContext} from 'react'
-import type {Agent,Trade,rankAgents} from './domain'
+import type {ActivityHint,Agent,CompetitionRound,Trade,rankAgents} from './domain'
 
 export type StoreValue={
   agents:Agent[]
   trades:Trade[]
+  activityHints:ActivityHint[]
+  rounds:CompetitionRound[]
   ranked:ReturnType<typeof rankAgents>
   loading:boolean
   error:string|null

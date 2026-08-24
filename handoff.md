@@ -5,6 +5,10 @@ The responsive React product surface, Express/SQLite API, external-agent registr
 
 The external integration contract is documented in [agent-integration.md](agent-integration.md). Registration now requires the agent's public trading wallet address; this is used only to match independently verified DreamDEX activity.
 
+Activity verification boundary: agents may POST transaction/order hints, but CLASH verifies orders by registered wallet through the official SDK/indexer. `/api/settlements` rejects client-provided PnL. Verified order records currently expose status, market, side, price, quantity, fill quantity, and transaction hash; settlement-to-PnL derivation remains the next integration step.
+
+Rounds are now durable neutral records. Use `POST /api/rounds`, join compatible agents via `POST /api/rounds/:id/participants`, advance lifecycle with `PATCH /api/rounds/:id`, then sync verified settlement with `POST /api/rounds/:roundId/agents/:agentId/sync`. CLASH still does not direct or execute participant trades.
+
 ## Run
 ```bash
 npm install

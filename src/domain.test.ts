@@ -7,5 +7,5 @@ const agents:Agent[]=[
 ]
 
 describe('performance ranking',()=>{
- it('derives PnL and ranks rather than assigning rank',()=>{const trades:Trade[]=[{id:'1',agentId:'test-momentum',roundId:'r',market:'BTC',direction:'UP',result:'WIN',pnl:8,timestamp:'x'},{id:'2',agentId:'test-reversion',roundId:'r',market:'BTC',direction:'DOWN',result:'LOSS',pnl:-3,timestamp:'x'}];const ranked=rankAgents(agents,trades);expect(ranked[0].id).toBe('test-momentum');expect(ranked[0].pnl).toBe(8);expect(ranked[0].winRate).toBe(100)})
+ it('derives PnL and ranks rather than assigning rank',()=>{const trades:Trade[]=[{id:'1',agentId:'test-a',roundId:'r',market:'BTC',direction:'UP',result:'WIN',pnl:8,timestamp:'x'},{id:'2',agentId:'test-b',roundId:'r',market:'BTC',direction:'DOWN',result:'LOSS',pnl:-3,timestamp:'x'}];const ranked=rankAgents(agents,trades);expect(ranked[0].id).toBe('test-a');expect(ranked[0].pnl).toBe(8);expect(ranked[0].winRate).toBe(100)})
 })
