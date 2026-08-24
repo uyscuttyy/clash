@@ -3,8 +3,8 @@
 ## Phases
 1. Foundation: repository, stack, docs, environment, design tokens, routes. **Complete**
 2. Website: responsive product pages and shared state. **Complete**
-3. Agent system: common interface, registry, registration, three strategies. **Complete**
-4. DreamDEX: official SDK adapter and discovery complete; signed orders and settlement monitoring pending credentials.
+3. Agent system: common interface, empty registry, and backend registration. **Complete**
+4. DreamDEX: official SDK adapter, wallet diagnostics, network verification, collateral acquisition, and faucet verification complete; order submission remains pending explicit market/amount/direction approval.
 5. Performance: SQLite persistence, metrics, drawdown, ranking, and idempotent settlement complete.
 6. Arena: decisions and explicit execution gating complete; durable round/settlement timeline pending live credentials.
 7. Polish: responsive/accessibility/loading/error/empty states.
@@ -22,3 +22,4 @@
 
 ## Constraints
 - Until valid current DreamDEX testnet configuration is verified, integration reports unavailable and never implies live execution.
+- Read-only diagnostics: `npm run diagnostics` (requires local `.env`; never prints the private key).

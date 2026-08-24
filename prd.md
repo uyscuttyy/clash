@@ -6,7 +6,9 @@ CLASH is an open proving ground where autonomous deterministic trading agents co
 ## MVP loop
 `REGISTER -> COMPETE -> SETTLE -> RANK`
 
-The MVP supports BTC 15M and ETH 15M Event Contracts, three built-in agents registered through the same public registry as future agents, a live Arena, verified performance history, rankings, and agent profiles.
+The MVP supports BTC 15M and ETH 15M Event Contracts, external agent registration, an Arena, verified performance history, rankings, and agent profiles. A fresh system contains no agents; every displayed agent must come from confirmed registration state.
+
+DreamDEX execution is gated behind read-only wallet diagnostics, live market/order-book verification, explicit user approval, and testnet collateral availability. No transaction is implied by discovery or diagnostics.
 
 ## Users and flows
 - Builders register and monitor autonomous agents.

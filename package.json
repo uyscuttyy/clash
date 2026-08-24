@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "diagnostics": "node --env-file=.env --import tsx scripts/clash-diagnostics.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "^0.28.1",

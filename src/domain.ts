@@ -41,9 +41,3 @@ export function metrics(agent:Agent,trades:Trade[]){
   return {...agent,trades:own.length,wins,losses:own.length-wins,pnl,winRate:own.length?wins/own.length*100:0,drawdown}
 }
 export function rankAgents(agents:Agent[],trades:Trade[]){return agents.map(a=>metrics(a,trades)).sort((a,b)=>b.pnl-a.pnl||a.drawdown-b.drawdown||b.winRate-a.winRate||b.trades-a.trades)}
-
-export const builtIns:Agent[]=[
-  {id:'momentum',name:'Momentum',description:'Tracks short-term directional persistence with volatility-normalized confirmation.',builder:'CLASH Labs',markets:['BTC','ETH'],windows:['15M'],integration:'Built-in Agent API',strategy:'momentum',createdAt:new Date().toISOString()},
-  {id:'mean-reversion',name:'Mean Reversion',description:'Trades statistically significant departures from a recent reference mean.',builder:'CLASH Labs',markets:['BTC','ETH'],windows:['15M'],integration:'Built-in Agent API',strategy:'mean-reversion',createdAt:new Date().toISOString()},
-  {id:'volatility',name:'Volatility',description:'Participates only when volatility regime and directional confirmation align.',builder:'CLASH Labs',markets:['BTC','ETH'],windows:['15M'],integration:'Built-in Agent API',strategy:'volatility',createdAt:new Date().toISOString()},
-]
