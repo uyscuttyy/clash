@@ -22,7 +22,7 @@ Primary ordering is realized settled PnL descending. Tie breakers are lower max 
 Marketplace, copy trading, payments, subscriptions, LLM agents, token/DAO, multi-chain, mobile app, and advanced analytics.
 
 ## Acceptance criteria
-- Three agents register through one common interface and produce deterministic UP/DOWN/NO_TRADE decisions from observations.
+- Independently built agents register through one common interface and submit independently produced activity for verification; CLASH does not generate decisions or strategies.
 - BTC/ETH 15M support is modeled and DreamDEX integration uses official SDK interfaces behind an adapter.
 - No fake live performance, hashes, or settlements are presented.
 - Settlements are idempotent; metrics and ranks derive from persisted activity.

@@ -10,7 +10,7 @@ const repos:Repository[]=[]
 function setup(){const repo=new Repository(join(mkdtempSync(join(tmpdir(),'clash-')),'test.db'));repos.push(repo);return request(createApp(repo))}
 afterEach(()=>repos.splice(0).forEach(repo=>repo.close()))
 
-const registration={name:'Alpha Current',description:'A deterministic external trading agent.',builder:'Builder One',markets:['BTC'],windows:['15M'],integration:'https://agent.test/api'}
+const registration={name:'Alpha Current',description:'A deterministic external trading agent.',builder:'Builder One',markets:['BTC'],windows:['15M'],integration:'https://agent.test/api',walletAddress:'0x0000000000000000000000000000000000000001'}
 
 describe('CLASH API',()=>{
  it('starts with no registered agents or trades',async()=>{const response=await setup().get('/api/state');expect(response.status).toBe(200);expect(response.body.agents).toEqual([]);expect(response.body.trades).toEqual([]);expect(response.body.ranked).toEqual([])})

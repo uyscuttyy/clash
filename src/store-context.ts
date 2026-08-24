@@ -8,7 +8,7 @@ export type StoreValue={
   loading:boolean
   error:string|null
   dreamdex:{network:string;chainId:number;configured:boolean;mode:string}|null
-  register:(agent:Omit<Agent,'id'|'createdAt'|'strategy'>)=>Promise<void>
+  register:(agent:Omit<Agent,'id'|'createdAt'>)=>Promise<void>
 }
 
 export const StoreContext=createContext<StoreValue|null>(null)

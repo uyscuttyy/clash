@@ -7,7 +7,7 @@ export function StoreProvider({children}:{children:ReactNode}){
  // The initial API request synchronizes the client with durable server state.
  // oxlint-disable-next-line react(set-state-in-effect)
  useEffect(()=>{void load()},[load])
- const register=useCallback(async(agent:Omit<Agent,'id'|'createdAt'|'strategy'>)=>{const response=await fetch('/api/agents',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(agent)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Registration failed');await load()},[load])
+ const register=useCallback(async(agent:Omit<Agent,'id'|'createdAt'>)=>{const response=await fetch('/api/agents',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(agent)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Registration failed');await load()},[load])
  const value=useMemo(()=>({agents,trades,ranked:rankAgents(agents,trades),loading,error,dreamdex,register}),[agents,trades,loading,error,dreamdex,register])
  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

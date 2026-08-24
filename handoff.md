@@ -1,7 +1,9 @@
 # CLASH Handoff
 
 ## Current state
-The responsive React product surface, Express/SQLite API, durable registration, common agent contract, Arena empty state, derived rankings, idempotent settlement processing, profiles, and read-only DreamDEX wallet diagnostics are implemented. No agents are preloaded.
+The responsive React product surface, Express/SQLite API, external-agent registration, Arena empty state, derived rankings, idempotent settlement processing, profiles, and read-only DreamDEX developer diagnostics are implemented. CLASH contains no strategy engine, agent signer, wallet custodian, or order executor. No agents are preloaded.
+
+The external integration contract is documented in [agent-integration.md](agent-integration.md). Registration now requires the agent's public trading wallet address; this is used only to match independently verified DreamDEX activity.
 
 ## Run
 ```bash
