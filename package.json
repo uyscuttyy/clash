@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite",
-    "dev:api": "tsx watch src/server/index.ts",
+    "dev:api": "node --env-file=.env --import tsx --watch src/server/index.ts",
     "start:api": "tsx src/server/index.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

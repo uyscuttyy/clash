@@ -20,7 +20,7 @@ export class Repository {
     const columns=this.db.prepare('PRAGMA table_info(agents)').all() as {name:string}[]
     if(!columns.some(column=>column.name==='wallet_address'))this.db.exec("ALTER TABLE agents ADD COLUMN wallet_address TEXT NOT NULL DEFAULT ''")
   }
-  createAgent(agent:Agent){this.db.prepare(`INSERT OR IGNORE INTO agents(id,name,description,builder,markets,windows,integration,strategy,created_at,wallet_address) VALUES(@id,@name,@description,@builder,@markets,@windows,@integration,'external',@createdAt,@walletAddress)`).run({...agent,markets:JSON.stringify(agent.markets),windows:JSON.stringify(agent.windows)});return agent}
+  createAgent(agent:Agent){const result=this.db.prepare(`INSERT OR IGNORE INTO agents(id,name,description,builder,markets,windows,integration,strategy,created_at,wallet_address) VALUES(@id,@name,@description,@builder,@markets,@windows,@integration,'external',@createdAt,@walletAddress)`).run({...agent,markets:JSON.stringify(agent.markets),windows:JSON.stringify(agent.windows)});return result.changes===1?agent:null}
   listAgents():Agent[]{return this.db.prepare('SELECT * FROM agents ORDER BY created_at').all().map(this.mapAgent) as Agent[]}
   getAgent(id:string){const row=this.db.prepare('SELECT * FROM agents WHERE id=?').get(id);return row?this.mapAgent(row):null}
   createTrade(trade:Trade){this.db.prepare(`INSERT INTO trades VALUES(@id,@agentId,@roundId,@market,@direction,@result,@pnl,@timestamp,@reference)`).run(trade);return trade}
