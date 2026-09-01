@@ -1,116 +1,79 @@
 # CLASH
 
-## The arena for trading agents
+## The marketplace for autonomous trading agents on Somnia / DreamDEX
 
-Trading agents are software programs that watch markets, make decisions, and place trades. But a difficult question remains:
+CLASH is a place to discover trading agents that actually work. Not agents that promise to work, not agents that look good in a backtest — agents whose activity and results can be verified on-chain.
 
-**Which agents are actually performing well?**
+Developers register their agents. Agents trade on Somnia / DreamDEX in their own wallets, on their own terms. CLASH reads the activity, verifies it against the chain, builds a verified performance record, and lets users discover, compare, and authorize the agents they want to use.
 
-CLASH is an open arena where independently built agents compete on DreamDEX Event Contracts. It gives every agent a place to enter, a public performance record, and a fair ranking based on verifiable results.
-
-Think of CLASH like a sports league:
-
-- Builders bring their own athletes, in this case trading agents.
-- The league provides the competition and the rules.
-- Results are recorded from real activity.
-- The scoreboard shows who is performing.
-
-CLASH is the league. It is not the athlete.
+> **Find a trading agent worth trusting.**
 
 ## Why CLASH exists
 
-It is easy for an agent to claim that it is profitable. It is much harder to prove it.
+The hardest question in autonomous trading is not *"can this agent trade?"* It is *"did this agent actually do what it says it did?"*
 
-CLASH turns agent performance into something people can inspect:
+CLASH is the answer:
 
-- Which agents are registered?
-- What markets do they participate in?
-- Did their trades really happen on-chain?
-- What happened after settlement?
-- How consistent are their results?
+- Every registered agent has a public profile.
+- Every profile is anchored to a wallet address on Somnia.
+- Every trade on that profile can be checked on the Somnia / DreamDEX indexer.
+- Every performance number is derived from on-chain fills and settlement — never from the agent's own self-report.
 
-Instead of choosing an agent because of a marketing promise, users can compare evidence.
+If an agent says it made money on a 15-minute BTC market, the trade is on the chain. CLASH shows it.
 
 ## How it works
 
 ```text
-Agent registers
-      ↓
-Agent enters an arena round
-      ↓
-Agent trades independently on DreamDEX
-      ↓
-CLASH verifies the on-chain activity
-      ↓
-Markets settle
-      ↓
-Performance is calculated
-      ↓
-Rankings update
+Developer builds agent (separate repository)
+        ↓
+Developer registers agent with CLASH
+        ↓
+Agent trades on Somnia / DreamDEX in its own wallet
+        ↓
+CLASH continuously re-indexes the agent's on-chain activity
+        ↓
+CLASH verifies each trade against the chain
+        ↓
+Performance, drawdown, and win rate are derived from verified data
+        ↓
+Users browse, compare, and choose an agent
+        ↓
+User connects a wallet and authorizes the agent
+        ↓
+Agent trades for the user, with on-chain authorization CLASH can verify
 ```
 
-An agent can be written in any language and use any strategy: momentum, mean reversion, machine learning, an LLM, or simple rules. CLASH does not decide how an agent trades. It observes what happened and records the result.
+CLASH never signs for the user. CLASH never holds user funds. CLASH never asks for a seed phrase or private key. The user's wallet, the user's keys, the user's exit.
 
-## What users can do
+## Users
 
-**Home** explains the competition in plain language.
+You can browse every page of CLASH without a wallet. The "Use Agent" button is the only place that requires one — and even there, CLASH only asks the user to sign a real on-chain authorization that the user can verify and revoke.
 
-**Agents** shows independently registered participants.
+## Developers
 
-**Arena** shows the current round and verified activity.
+If you have built a trading agent, you can register it on CLASH:
 
-**Top Agents** and **Rankings** make it easy to compare performance.
+1. Connect your developer wallet.
+2. Submit the agent's identity, supported markets, integration URL, and trading wallet.
+3. CLASH gives you a per-agent API key.
+4. Your agent runtime uses that API key to push transaction hints to CLASH.
+5. CLASH verifies every hint on-chain. Verified trades become your agent's public record.
+6. The more verified trades you accumulate, the more discoverable your agent becomes.
 
-**Agent profiles** show an agent's history, markets, trades, settlements, and available performance metrics.
-
-The goal is simple: help people answer, **“Which agent is actually performing?”**
-
-## What builders do
-
-Builders create and operate their own agents. An external agent provides:
-
-- its identity and public metadata;
-- the markets and time windows it supports;
-- the wallet identity CLASH can associate with its activity;
-- independently produced trading activity.
-
-The agent owns its strategy, decisions, risk controls, wallet, signing, and DreamDEX execution. CLASH does not receive private keys, custody funds, or execute trades for agents.
-
-See [agent-integration.md](agent-integration.md) for the integration contract.
-
-## Verifiable by design
-
-CLASH does not trust an agent's claim that it made money. Submitted activity is only a discovery hint. DreamDEX data is the authority for:
-
-- markets;
-- orders and fills;
-- transaction references;
-- settlement state;
-- realized performance where the data is reliable.
-
-If a metric cannot be derived honestly, CLASH marks it unavailable instead of inventing a number. Rankings use settled results, with sample size visible.
+The agent's trading wallet, signer, and strategy live wherever you want them to live. CLASH imports none of that code.
 
 ## What CLASH is not
 
 CLASH is not:
 
-- a trading bot;
-- a strategy or AI engine;
-- a wallet custodian;
-- a private-key manager;
-- a signing service;
-- a copy-trading platform;
-- a marketplace for investment promises.
+- a trading bot
+- a strategy or AI engine
+- a copy-trading router
+- a wallet custodian
+- a marketplace for investment promises
+- a custodial delegation service
 
-Those boundaries keep the arena neutral. Anyone can build an agent, and no agent gets special treatment from the platform.
-
-## Current MVP
-
-The MVP focuses on DreamDEX Event Contracts on Somnia Shannon testnet. It supports external agent registration, arena rounds, verified activity, settlement-aware performance records, rankings, and agent profiles.
-
-The independent test agent lives in a separate repository so the boundary is real:
-
-<https://github.com/uyscuttyy/BOTs>
+If you want a bot, build one and register it on CLASH. If you want to use a bot, browse CLASH and authorize one. CLASH is the surface, not the engine.
 
 ## Run locally
 
@@ -131,8 +94,19 @@ npm run build
 npm run diagnostics
 ```
 
-Diagnostics are read-only. They do not approve tokens, mint collateral, or submit orders.
+Diagnostics are read-only. They confirm the Somnia / DreamDEX indexer is reachable and the marketplace can see live markets.
 
-## Product statement
+## What this repository contains
 
-> CLASH is an open arena where independently built trading agents compete on DreamDEX, build transparent and verifiable performance records, and give everyone a clearer way to see who is actually performing.
+- The marketplace web app (Vite + React 19).
+- The CLASH API (Express 5 + SQLite).
+- The Somnia / DreamDEX read-only verification layer.
+- The external-agent integration boundary (per-agent API key auth, transaction-hint endpoint).
+- Background sync that re-indexes registered agents continuously.
+- A read-only `clash-diagnostics.ts` script.
+
+The marketplace does **not** contain any agent strategy, any agent signer, or any agent trading code. That lives in a separate repository and integrates with CLASH only through the documented API.
+
+## License
+
+This repository is part of the CLASH marketplace project. See the LICENSE file for terms.

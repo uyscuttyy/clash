@@ -1,38 +1,41 @@
-import { formatUnits, createPublicClient, http, type Address } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+// CLASH diagnostics: a read-only check that the marketplace can talk to the
+// Somnia Shannon testnet indexer and RPC. CLASH does not own a signer, so
+// the diagnostics script no longer prints a wallet address — it only checks
+// the network, the indexer, and the list of active binary markets.
+
 import { SomniaMarkets, SOMNIA_TESTNET_ADDRESSES } from '@somnia-chain/markets-sdk'
 import { somniaShannon } from '@somnia-chain/markets-sdk/chains'
+import { createPublicClient, http } from 'viem'
 
-const erc20Abi = [
-  { name: 'balanceOf', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }], outputs: [{ type: 'uint256' }] },
-  { name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ type: 'uint256' }] },
-  { name: 'decimals', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
-] as const
-
-const key = process.env.DREAMDEX_PRIVATE_KEY
-if (!key) throw new Error('DREAMDEX_PRIVATE_KEY is not configured')
-const account = privateKeyToAccount(key as `0x${string}`)
-const rpc = somniaShannon.rpcUrls.default.http[0]
-const client = createPublicClient({ chain: somniaShannon, transport: http(rpc) })
+const rpc = somniaShannon.rpcUrls.default.http[0]!
+const indexer = 'https://dev.smk.somnia.host/v1/graphql'
 const addresses = SOMNIA_TESTNET_ADDRESSES
 
-const exchange = new SomniaMarkets({ chain: somniaShannon, indexerUrl: 'https://dev.smk.somnia.host/v1/graphql', wsRpcUrl: somniaShannon.rpcUrls.default.webSocket[0], addresses })
+const client = createPublicClient({ chain: somniaShannon, transport: http(rpc) })
+const exchange = new SomniaMarkets({ chain: somniaShannon, indexerUrl: indexer, wsRpcUrl: somniaShannon.rpcUrls.default.webSocket[0]!, addresses })
 try {
-  const [chainId, native, markets] = await Promise.all([client.getChainId(), client.getBalance({ address: account.address }), exchange.fetchMarkets()])
-  const binary = markets.filter((m) => m.type === 'binary' && m.active)
-  const proposed = binary.filter((m) => m.info?.asset === 'BTC' && m.info?.interval === '15m').sort((a, b) => Number(a.info?.expiry ?? 0) - Number(b.info?.expiry ?? 0))[0]
-  const token = (proposed?.info?.collateral ?? addresses.collateral ?? addresses.testUsdc) as Address | undefined
-  if (!token) throw new Error('No collateral token is configured by the SDK')
-  const spender = proposed?.info?.poolAddress as Address | undefined
-  const decimals = await client.readContract({ address: token, abi: erc20Abi, functionName: 'decimals' })
-  const [balance, allowance] = await Promise.all([
-    client.readContract({ address: token, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }),
-    spender ? client.readContract({ address: token, abi: erc20Abi, functionName: 'allowance', args: [account.address, spender] }) : Promise.resolve(0n),
+  const [chainId, blockNumber, markets] = await Promise.all([
+    client.getChainId(),
+    client.getBlockNumber(),
+    exchange.fetchMarkets(),
   ])
-  console.log('Clash Diagnostics ────────────────────────────')
-  console.log(`Network: Somnia Shannon Testnet\nChain ID: ${chainId}\nRPC endpoint: ${rpc}\nSigner: ${account.address}`)
-  console.log(`STT Balance: ${formatUnits(native, 18)}\ntUSDC Token: ${token}\ntUSDC Balance: ${formatUnits(balance, decimals)}\nDreamDEX Spender: ${spender ?? 'unresolved'}\ntUSDC Allowance: ${formatUnits(allowance, decimals)}`)
-  console.log(`Markets discovered: ${markets.length} (${binary.length} active binary)\nAddresses: ${JSON.stringify(addresses, null, 2)}`)
-  if (proposed) console.log(`PROPOSED TEST ORDER ────────────────────────────\nMarket: ${proposed.symbol}\nMarket ID: ${proposed.id}\nPool: ${proposed.info?.poolAddress}\nAsset: ${proposed.info?.asset}\nDuration: ${proposed.info?.interval}\nDirection: UP (BUY_YES)\nMinimum quantity: ${proposed.limits?.amount?.min ?? 'unresolved'}\nToken: tUSDC (${token})\nStatus: ${balance > 0n ? (allowance > 0n ? 'READY FOR REVIEW' : 'NEEDS ALLOWANCE') : 'NEEDS COLLATERAL'}\n────────────────────────────`)
-  else console.log('PROPOSED TEST ORDER: No active BTC 15m market currently available.')
+  const binary = markets.filter(m => m.type === 'binary' && m.active)
+  const eth15m = binary.filter(m => m.info?.asset === 'ETH' && m.info?.interval === '15m')
+  const btc15m = binary.filter(m => m.info?.asset === 'BTC' && m.info?.interval === '15m')
+
+  console.log('CLASH diagnostics ────────────────────────────')
+  console.log(`Network:           Somnia Shannon Testnet`)
+  console.log(`Chain ID:          ${chainId}`)
+  console.log(`RPC endpoint:      ${rpc}`)
+  console.log(`Indexer:           ${indexer}`)
+  console.log(`Block number:      ${blockNumber}`)
+  console.log(`Active markets:    ${binary.length} binary (of ${markets.length} total)`)
+  console.log(`ETH 15m markets:   ${eth15m.length}`)
+  console.log(`BTC 15m markets:   ${btc15m.length}`)
+  console.log(`SDK addresses:`)
+  console.log(`  collateral:      ${addresses.collateral ?? addresses.testUsdc}`)
+  console.log(`  binary module:   ${addresses.binaryModule ?? 'unresolved'}`)
+  console.log(`  binary settlement: ${addresses.binarySettlement ?? 'unresolved'}`)
+  console.log('─────────────────────────────────────────────')
+  console.log('CLASH holds no private key. The marketplace reads from this network only.')
 } finally { await exchange.close() }

@@ -1,27 +1,29 @@
 # CLASH Memory
 
 ## Decisions
-- One React app plus Express API and SQLite keeps the hackathon surface small while retaining clean boundaries.
-- Strategies are deterministic and receive the same immutable observation per round.
-- Realized PnL leads ranking; drawdown, win rate, and sample size provide context.
+- The marketplace product surface is wallet-free for browsing. Only the "Use Agent" flow needs a wallet connection.
+- CLASH is not a trader. The CLASH server holds no private keys, signs no transactions, and runs no strategy.
+- The Somnia / DreamDEX SDK is the only on-chain integration path. CLASH imports `@somnia-chain/markets-sdk` for read-only verification and for the spot operator grant write path. Spot order placement happens from the user's wallet through the SDK's `walletClient`-based `createTrader`, never from a CLASH-owned key.
+- The "Use Agent" flow has three honest paths, each grounded in a real Somnia / DreamDEX capability:
+  1. **Spot operator grant** — `setOperatorApprovalForPool` from the user's wallet; verified by `isOperatorAuthorized`.
+  2. **Session transaction / EIP-7702** — for agents that publish their own session implementation; CLASH only verifies the on-chain authorization.
+  3. **Self-run** — the user funds their own wallet and runs the agent's open-source code. CLASH never asks for a private key or seed phrase.
+- External agents authenticate with per-agent API keys, never with wallet signatures. Wallet signatures are reserved for users and developers (the people holding wallets).
+- The background sync worker re-indexes every registered agent's verified trades on an interval (default: 5 minutes) so the marketplace stays current without a profile visit triggering sync.
 
-## DreamDEX findings
-- Official docs are GitBook with markdown alternates.
-- Official `dreamdex-bot-kit` requires Node 20+, uses ESM, and demonstrates an SDK-driven Somnia CLOB workflow.
-- `@somnia-chain/markets-sdk` is installed. Exact integration configuration remains sourced from official docs and environment.
-- Installed SDK `0.28.1` documents Shannon testnet chain id `50312`, indexer `https://dev.smk.somnia.host/v1/graphql`, WebSocket RPC `wss://api.infra.testnet.somnia.network/ws`, and exported `SOMNIA_TESTNET_ADDRESSES`.
-- Official unified flow is `new SomniaMarkets(...)`, `loadMarkets`/`fetchMarkets`, and `createOrder`; binary settlement reads include `getMarketResolution`.
+## Somnia / DreamDEX findings (2026-09)
+- **Somnia Ingot hard fork** (`somnia-c1a0de06c6bcdae-release`, activated 15 Apr 2026) introduced:
+  - **Reactivity** — on-chain event subscriptions.
+  - **Session transactions** — user pre-authorizes a sequence of transactions.
+  - **EIP-7702** — an EOA can temporarily act as a smart contract via an authorization tuple.
+  - **Agentic L1** — branding only; the protocol is "for agents and applications."
+- The **June 3 hotfix** (`somnia-f03d9d276649877-release`) added *Session transaction cancellation and timeout* (#1685), the maturity fix for sessions.
+- These primitives are **real on Somnia Shannon testnet** and are **not yet exposed as a high-level helper by `@somnia-chain/markets-sdk@0.28.1`**.
+- Binary event contracts have **no operator-grant primitive in the SDK** today. The only delegation primitive that works against binary markets today is the user's own EOA signing the order. Spot markets have `setOperatorApprovalForPool` / `setOperatorApprovalGlobal`.
+- The SDK's EIP-712 signed primitive is `signRedeemAuth` / `redeemFor`, which is for post-settlement redemption only.
 
 ## Constraints
 - Network access may be intermittent. Do not infer interfaces or present unavailable integration as live.
-- Never commit secrets.
-# DreamDEX verification checkpoint (2026-08-24)
-- `npm run diagnostics` is a read-only command using the installed official SDK and local `.env`.
-- Verified chain: Somnia Shannon Testnet (`50312`), native gas token STT, RPC `https://api.infra.testnet.somnia.network`.
-- Signer address derived locally: `0x8068FcfdCdbF559ECE244a01aC2E6B3DEf40613C`; private key is never emitted.
-- Live indexer discovery succeeded: 557 markets, 12 active binary. Current BTC 15m example: `BTC-0-24AUG26-0830/tUSDC`, pool `0xd6fbbe5eb2d7de1071eb07da69a8e18482f9e927`, minimum quantity `0.001`.
-- tUSDC/TestUSDC address from SDK: `0x70a86D8842FB63C4Ad2b7cdddF530eBf1BB25d8E`; wallet balance and pool allowance are both zero.
-- SDK order method is `createTrader(...).placeOrder`; binary buy maps to `BUY_YES`/`BUY_NO`, calls pool `placeBinaryOrder`, and auto-approves the collateral token to that pool by default. `buildPlaceOrder` is the non-sending inspection path.
-- SDK includes `trader.faucet()` -> TestUSDC `faucet` contract call. Do not invoke without explicit user approval.
-- Faucet inspection and execution: official explorer source for TestUSDC confirms public `faucet(uint256)` with `FAUCET_PER_TX = 10,000 tUSDC`, no cooldown/per-wallet limit. Approved SDK faucet succeeded in tx `0x30ad2b848456e85c414c7ef5b727d438ab49868708a30864d7380f58751683e6`; balance is now 10,000 tUSDC, allowance remains 0, STT is 0.998481172.
-- Stop before any approval, faucet, or order transaction. Exact price, collateral amount, and gas estimate remain to be read from the live book for an explicitly approved market.
+- Never commit secrets. `DREAMDEX_PRIVATE_KEY` is not in this repository and must not be reintroduced.
+- No CLASH-owned agent code. The separate trading-agent repository owns strategy, signer, and trading logic.
+- Testnet only for the MVP. Mainnet is a future plan.

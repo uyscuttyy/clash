@@ -6,23 +6,25 @@
   "scripts": {
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite",
-    "dev:api": "node --env-file=.env --import tsx --watch src/server/index.ts",
-    "start:api": "tsx src/server/index.ts",
+    "dev:api": "node --import tsx --watch src/server/index.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "diagnostics": "node --env-file=.env --import tsx scripts/clash-diagnostics.ts",
-    "order:preview": "node --env-file=.env --import tsx scripts/clash-order-preview.ts"
+    "diagnostics": "node --import tsx scripts/clash-diagnostics.ts"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.0",
     "@somnia-chain/markets-sdk": "^0.28.1",
+    "@tanstack/react-query": "^5.102.8",
     "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
     "lucide-react": "^0.468.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "7.18.2",
+    "viem": "^2.22.0",
+    "wagmi": "^2.14.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -40,5 +42,9 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3"
   }
 }

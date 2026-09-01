@@ -1,41 +1,77 @@
 # CLASH Handoff
 
 ## Current state
-The responsive React product surface, Express/SQLite API, external-agent registration, Arena empty state, derived rankings, idempotent settlement processing, profiles, and read-only DreamDEX developer diagnostics are implemented. CLASH contains no strategy engine, agent signer, wallet custodian, or order executor. No agents are preloaded.
+The CLASH repository is being restructured from a "round / arena" product into a marketplace for autonomous trading agents. The old CLASH concept and all CLASH-owned trading code have been removed. CLASH no longer holds a private key, runs a strategy, signs transactions, or executes trades. CLASH is a discovery + verification + authorization interface only.
 
-The external integration contract is documented in [agent-integration.md](agent-integration.md). Registration now requires the agent's public trading wallet address; this is used only to match independently verified DreamDEX activity.
+## What was removed (2026-09)
+- `rounds` and `round_participants` tables and all endpoints (`/api/rounds`, `/api/rounds/:id/participants`, `PATCH /api/rounds/:id`, `/api/rounds/:roundId/agents/:agentId/sync`).
+- `activity_hints` table and `/api/agents/:id/activity` (the discovery-hint path is preserved as `agent_api_keys` authenticated `POST /api/external/agents/:id/activity` for external agents only).
+- The `Arena` UI page, `Rankings` ("competitive field") framing, `Future` page, and the `manifesto` / "agents compete" / "Enter Clash" hero copy.
+- `scripts/clash-order-preview.ts` (it built an unsigned order for a CLASH-owned wallet; that was a CLASH bot primitive).
+- `DREAMDEX_PRIVATE_KEY` from `.env.example` and from `clash-diagnostics.ts` (the diagnostics script no longer prints a signer address it does not own).
 
-Activity verification boundary: agents may POST transaction/order hints, but CLASH verifies orders by registered wallet through the official SDK/indexer. `/api/settlements` rejects client-provided PnL. Verified order records currently expose status, market, side, price, quantity, fill quantity, and transaction hash; settlement-to-PnL derivation remains the next integration step.
+## What is preserved
+- The Somnia testnet chain definition, the wallet providers (Wagmi + RainbowKit), and the read-only DreamDEX SDK adapter.
+- The `Agent` and `Trade` domain types, `metrics()` and `rankAgents()` math.
+- The `money()` and `formatUtcStamp()` formatters.
+- The base CSS, the layout shell, the `App.tsx` routing scaffolding.
+- `npm test` (Vitest + Supertest) and `npm run build` (TypeScript + Vite) both pass.
 
-Rounds are now durable neutral records. Use `POST /api/rounds`, join compatible agents via `POST /api/rounds/:id/participants`, advance lifecycle with `PATCH /api/rounds/:id`, then sync verified settlement with `POST /api/rounds/:roundId/agents/:agentId/sync`. CLASH still does not direct or execute participant trades.
+## What is new
+- `developers`, `agent_api_keys` tables.
+- External-agent API key authentication (`Authorization: Bearer <key>` on the agent-scoped endpoints).
+- Three "Use Agent" authorization paths, each grounded in a real Somnia / DreamDEX protocol capability:
+  1. **Spot operator grant** — uses the SDK's `setOperatorApprovalForPool` from the user's wallet; verified by `isOperatorAuthorized`.
+  2. **Session transaction / EIP-7702** — for agents that publish their own session implementation; CLASH only verifies the on-chain authorization.
+  3. **Self-run** — the user funds their own wallet and runs the agent's open-source code. CLASH never asks for a private key or seed phrase.
+- A background sync worker that continuously re-indexes each registered agent's verified trades from Somnia.
+- A new marketplace frontend: Home, Explore, Rankings, Activity, AgentProfile, UseAgent, Developers.
+- The CLASH database has been wiped. A seed of demo data is **not** included — the marketplace starts empty and fills as developers register agents. To produce demo data, run the separate trading-agent repository and let it register through the external-agent integration.
 
 ## Run
 ```bash
 npm install
 npm run dev
 ```
-
 Web: `http://localhost:5173`. API: `http://localhost:8787`.
 
 ## Environment
-Copy `.env.example` to `.env`. DreamDEX testnet settings are server-only and must come from current official documentation. Missing settings produce an unavailable state.
+Copy `.env.example` to `.env`. The marketplace does not require any private key. Only `PORT` and `DATABASE_PATH` are needed for the API.
 
-## Demo path
-Home -> Apps -> register an agent -> Arena -> Rankings -> Top Agents -> profile. Until Event Contracts are connected, the Arena accurately reports that execution and observations are unavailable.
+The previous `.env` file in this directory contained `DREAMDEX_PRIVATE_KEY` and is now obsolete. Delete it; the marketplace does not need it.
+
+## Demo path (marketplace)
+1. Open `http://localhost:5173`.
+2. Browse `Explore` without a wallet.
+3. Open any registered agent's profile.
+4. Click `Use Agent`.
+5. Connect a wallet (testnet, Somnia Shannon).
+6. CLASH determines the agent's delegation method and presents the appropriate authorization flow.
+7. Authorize (or run the agent yourself if it's a self-run agent).
+8. CLASH shows the live on-chain authorization state.
+
+## Demo path (developer)
+1. Click `Developers` in the nav.
+2. Connect a wallet.
+3. Register an agent — name, description, builder, markets, integration URL, trading wallet.
+4. Copy the API key (shown once).
+5. Hand the API key to the agent's runtime so it can `POST /api/external/agents/:id/activity` with transaction hints.
+6. Manage the agent from the developer dashboard.
+
+## What moved out
+
+The two test agents previously in the database are **no longer in this repository**. They have been moved to the separate trading-agent repository (`clash-test-agent/`) and will re-register with CLASH as external agents through the normal registration flow when work resumes there.
+
+Migration record of the moved agents:
+
+| Name | Owner wallet | Trading wallet | Notes |
+|---|---|---|---|
+| Independent Test Agent | `0x8068FcfdCdbF559ECE244a01aC2E6B3DEf40613C` | `0x8068FcfdCdbF559ECE244a01aC2E6B3DEf40613C` | One verified order (`0x18252ae6…`, rejected) and one filled order (`0x5442b96…`, verified). PnL −0.000557 tUSDC. |
+| CLASH Test Agent Alpha | `0x2ff06249C8aaB3B75060B3c25DCeB65ABBBB76DB` | `0x2ff06249C8aaB3B75060B3c25DCeB65ABBBB76DB` | Funded with 5,000 tUSDC + 0.4 STT for live testnet trades. |
+
+When these agents re-register from the separate repo, they will receive fresh CLASH IDs and start with a clean trade history. The on-chain activity they produced while inside CLASH will be re-discovered by the background sync worker and verified against the registered trading wallet.
 
 ## Remaining
-Signed DreamDEX order execution and settlement monitoring still require tUSDC and explicit approval. The configured signer has 1 STT, 0 tUSDC, and 0 allowance. API integration tests need a normal local listener; the managed sandbox rejects socket binding.
-
-## DreamDEX verification
-- Network: Somnia Shannon Testnet, chain ID `50312`, SDK RPC `https://api.infra.testnet.somnia.network`.
-- Signer is loaded from `DREAMDEX_PRIVATE_KEY` and is never printed; diagnostics reports only its derived address.
-- SDK addresses: collateral/TestUSDC `0x70a86D8842FB63C4Ad2b7cdddF530eBf1BB25d8E`, binary module `0x3ecC694Cef705358864a646142ac17A90E29e388`, binary settlement `0xbF4a49e0Dfd092e5FBE8E5761064C49533e6Ed23`, collateral router `0xbC0C9834B15ACE38bB50dDaa7d7f7C7CC4DC183C`.
-- The actual order spender is the selected binary pool, not the global module. The current BTC 15m example pool is discovered from the indexer at runtime.
-- Official order API: `exchange.client.createTrader({ privateKey }).placeOrder({ pool, side: 'BUY_YES'|'BUY_NO'|'SELL_YES'|'SELL_NO', price, quantity, orderType, expireTimestampNs, autoApprove })`. Binary writes call `placeBinaryOrder`; buy orders escrow collateral and require ERC-20 allowance to the pool. `buildPlaceOrder` returns unsigned order plus approval without sending.
-- Official testnet collateral flow: SDK exposes `trader.faucet()` which calls the configured TestUSDC contract's `faucet` function. It was inspected only and not called.
-- Faucet verified from official explorer source: anyone may call `faucet`, capped at `FAUCET_PER_TX = 10,000 tUSDC`; no cooldown or per-wallet limit is present. The approved SDK call succeeded: tx `0x30ad2b848456e85c414c7ef5b727d438ab49868708a30864d7380f58751683e6`, block `469894772`. Post-call diagnostics: `10,000 tUSDC`, `0` allowance, `0.998481172 STT`.
-- Current read-only result: 557 markets, 12 active binary; BTC 15m candidate `BTC-0-24AUG26-0830/tUSDC`, market ID `0x0000000000000000000000000000000000000000000000000000000000008253`, pool `0xd6fbbe5eb2d7de1071eb07da69a8e18482f9e927`, minimum quantity `0.001`, tUSDC balance `0`, allowance `0`.
-- No order is proposed for submission yet because the wallet has no tUSDC and the exact limit price / required collateral must be read from the live order book immediately before approval.
-
-## Known limitation
-Live DreamDEX execution cannot be claimed until valid testnet configuration is supplied and verified. The Arena currently shows deterministic decisions and explicitly gated execution state.
+- The separate trading-agent repository still uses the old `DREAMDEX_PRIVATE_KEY` configuration. That repo's job is to host the agent's strategy and signer. CLASH is not involved in that.
+- Documentation for the "Use Agent" spot operator grant UX will be filled out as the corresponding page is built.
+- The session transaction / EIP-7702 verification reads are scoped to what can be verified from chain state. If the external agent's implementation requires reading a custom registry, the agent must publish that registry's address in its `delegation_metadata` so CLASH knows where to look.
