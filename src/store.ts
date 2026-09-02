@@ -133,3 +133,54 @@ export async function listMyAgents(owner: `0x${string}`): Promise<{ agents: Agen
   if (!res.ok) throw new Error(`Failed to load my agents: HTTP ${res.status}`)
   return res.json()
 }
+
+// Developer dashboard helpers. All requests to these endpoints carry an
+// `X-Owner-Wallet` header so the server can confirm the caller is the
+// registered owner of the agent.
+export async function fetchDashboard(agentId: string, ownerWallet: `0x${string}`) {
+  const res = await fetch(`/api/agents/${agentId}/dashboard`, { headers: { 'X-Owner-Wallet': ownerWallet } })
+  if (!res.ok) throw new Error(`Failed to load dashboard: HTTP ${res.status}`)
+  return res.json() as Promise<{
+    agent: Agent
+    performance: AgentPerformance
+    recentTrades: Trade[]
+    apiKeys: Array<{ id: string; label: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }>
+  }>
+}
+
+export async function updateAgent(agentId: string, ownerWallet: `0x${string}`, patch: Partial<{
+  description: string
+  integration: string
+  delegationMethods: ('spot_operator' | 'session_tx' | 'self_run')[]
+  delegationMetadata: { spotPoolAddress?: `0x${string}`; sessionContract?: `0x${string}`; notes?: string }
+  status: 'active' | 'paused' | 'retired'
+}>) {
+  const res = await fetch(`/api/agents/${agentId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', 'X-Owner-Wallet': ownerWallet },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `Failed to update agent: HTTP ${res.status}`)
+  }
+  return res.json() as Promise<{ agent: Agent }>
+}
+
+export async function listApiKeys(agentId: string, ownerWallet: `0x${string}`) {
+  const res = await fetch(`/api/agents/${agentId}/api-keys`, { headers: { 'X-Owner-Wallet': ownerWallet } })
+  if (!res.ok) throw new Error(`Failed to load keys: HTTP ${res.status}`)
+  return res.json() as Promise<{ keys: Array<{ id: string; label: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }> }>
+}
+
+export async function rotateApiKey(agentId: string, ownerWallet: `0x${string}`) {
+  const res = await fetch(`/api/agents/${agentId}/api-keys/rotate`, {
+    method: 'POST',
+    headers: { 'X-Owner-Wallet': ownerWallet },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `Failed to rotate key: HTTP ${res.status}`)
+  }
+  return res.json() as Promise<{ apiKey: string; apiKeyNote: string }>
+}

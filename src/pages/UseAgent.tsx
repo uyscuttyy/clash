@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ExternalLink, ShieldCheck } from 'lucide-react'
 import { checkUseState, fetchAgent, recordUseState, revokeUseState, type Agent } from '../store'
 import { useAsync } from '../useAsync'
 import { useWallet } from '../useWallet'
+import { WalletControl } from '../WalletControl'
 
 type Path = 'spot_operator' | 'session_tx' | 'self_run'
 
@@ -118,8 +119,12 @@ export function UseAgent() {
 function WalletPrompt() {
   return (
     <div className="use-step">
-      <h3>1. Connect your wallet</h3>
-      <p className="muted">Use the connect button in the header. CLASH only asks your wallet to sign the authorization this agent requires — nothing else.</p>
+      <span className="use-step-num">1</span>
+      <div>
+        <h3>Connect your wallet</h3>
+        <p className="muted">CLASH only asks your wallet to sign the authorization this agent requires — nothing else. Your wallet stays under your control.</p>
+        <div className="use-wallet-row"><WalletControl /></div>
+      </div>
     </div>
   )
 }

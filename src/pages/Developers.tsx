@@ -1,7 +1,9 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { ArrowRight, Check, ChevronRight, Copy, Eye, EyeOff } from 'lucide-react'
 import { listMyAgents, registerAgent, type Agent } from '../store'
 import { useWallet } from '../useWallet'
+import { WalletControl } from '../WalletControl'
 
 type DelegationMethod = 'spot_operator' | 'session_tx' | 'self_run'
 
@@ -24,7 +26,13 @@ function DevelopersBody() {
   const { isConnected, address, isOnSomnia, switchToSomnia, isSwitching } = useWallet()
   const [view, setView] = useState<'overview' | 'form' | 'success'>('overview')
   if (!isConnected) {
-    return <div className="empty"><b>Connect your developer wallet to register an agent.</b><p>CLASH ties agent ownership to the connected wallet. The wallet is never asked to sign anything by CLASH itself.</p></div>
+    return (
+      <div className="empty">
+        <b>Connect your developer wallet to register an agent.</b>
+        <p>CLASH ties agent ownership to the connected wallet. The wallet is never asked to sign anything by CLASH itself.</p>
+        <div className="empty-action"><WalletControl /></div>
+      </div>
+    )
   }
   if (!isOnSomnia) {
     return <div className="empty"><b>Switch to Somnia to register an agent.</b><button className="button" onClick={switchToSomnia} disabled={isSwitching}>{isSwitching ? 'Switching…' : 'Switch to Somnia'}</button></div>
@@ -51,9 +59,14 @@ function Overview({ ownerAddress, onRegister }: { ownerAddress: `0x${string}`; o
           <ul className="dev-agent-list">
             {agents.map(a => (
               <li key={a.id}>
-                <b>{a.name}</b>
-                <small>{a.builder} · {a.markets.join(' / ')}</small>
-                <span className="status-chip" data-status={a.status}>{a.status}</span>
+                <Link to={`/developers/agents/${a.id}`} className="dev-agent-row">
+                  <span className="dev-agent-id">
+                    <b>{a.name}</b>
+                    <small>{a.builder} · {a.markets.join(' / ')}</small>
+                  </span>
+                  <span className="status-chip" data-status={a.status}>{a.status}</span>
+                  <ChevronRight />
+                </Link>
               </li>
             ))}
           </ul>

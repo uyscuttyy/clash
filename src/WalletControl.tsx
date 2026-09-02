@@ -1,22 +1,40 @@
-import {ConnectButton} from '@rainbow-me/rainbowkit'
-import {useWallet} from './useWallet'
+import { useState, useEffect } from 'react'
+import { useWallet } from './useWallet'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 /**
- * Header wallet control. Shows RainbowKit's connect button and, when the
- * wallet is on a non-Somnia chain, a prompt to switch.
+ * Connect button. The marketplace does not put this in the global header —
+ * wallet connection is reserved for the "Use Agent" and "Developers" pages.
+ * This component is the one place that decides what the connect UI looks
+ * like (a small inline button when nothing is connected, a compact address
+ * chip when it is).
  */
-export function WalletControl(){
-  const {isConnected,isOnSomnia,switchToSomnia,isSwitching}=useWallet()
+export function WalletControl({ compact = true }: { compact?: boolean }) {
+  const { isConnected, isOnSomnia, switchToSomnia, isSwitching } = useWallet()
+  // When RainbowKit mounts its modal, our component unmounts and remounts
+  // on close. That's fine — the provider handles its own state.
+  const [, setOpen] = useState(false)
+  useEffect(() => () => setOpen(false), [])
+  if (!isConnected) {
+    return (
+      <ConnectButton
+        label="Connect wallet"
+        accountStatus="address"
+        chainStatus="none"
+        showBalance={false}
+      />
+    )
+  }
   return (
     <div className="wallet-control">
-      {isConnected && !isOnSomnia
-        ? <button className="button small warn" onClick={()=>switchToSomnia()} disabled={isSwitching}>
+      {!isOnSomnia
+        ? <button className="button small warn" onClick={() => switchToSomnia()} disabled={isSwitching}>
             {isSwitching ? 'Switching…' : 'Switch to Somnia'}
           </button>
         : null}
       <ConnectButton
         accountStatus="address"
-        chainStatus={isConnected ? 'icon' : 'none'}
+        chainStatus={compact ? 'icon' : 'name'}
         showBalance={false}
       />
     </div>

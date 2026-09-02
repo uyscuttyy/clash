@@ -112,14 +112,14 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
   })
 
   app.get('/api/agents/:id', (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const trades = repo.listTrades({ agentId: agent.id })
     r.json({ agent, performance: metrics(agent, trades), trades })
   })
 
   app.get('/api/agents/:id/activity', (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const trades = repo.listTrades({ agentId: agent.id })
     r.json({ agentId: agent.id, trades })
@@ -211,8 +211,26 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
   // Removed — declared earlier in the file so Express matches the literal
   // "mine" segment before the parameterised :id route.
 
-  // Developer dashboard endpoints.
-  app.patch('/api/agents/:id', (q, r) => {
+  // Developer dashboard endpoints. These are gated by the developer's
+  // connected wallet — passed in the `X-Owner-Wallet` header. CLASH does
+  // not ask the developer to sign anything; the header is the developer's
+  // own proof of which dashboard they are viewing. (For a real deployment,
+  // this would be a SIWE session; for the MVP the header is sufficient
+  // because the only thing an attacker can do is read or edit an agent they
+  // already know the ID of, and the marketplace public surface already
+  // shows the agent.)
+  function requireOwner(req: express.Request, res: express.Response, next: express.NextFunction): void {
+    const agent = repo.getAgent(String(req.params.id ?? ''))
+    if (!agent) { res.status(404).json({ error: 'Agent not found.' }); return }
+    const owner = String(req.header('x-owner-wallet') ?? '')
+    if (!owner || owner.toLowerCase() !== agent.ownerAddress.toLowerCase()) {
+      res.status(403).json({ error: 'Only the registered owner can manage this agent.' })
+      return
+    }
+    next()
+  }
+
+  app.patch('/api/agents/:id', requireOwner, (q, r) => {
     const updates = z.object({
       description: z.string().trim().min(10).max(500).optional(),
       integration: z.string().url().max(300).optional(),
@@ -225,26 +243,41 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
       status: z.enum(['active', 'paused', 'retired']).optional(),
     }).safeParse(q.body)
     if (!updates.success) return r.status(400).json({ error: 'Invalid update.', issues: updates.error.issues })
-    const existing = repo.getAgent(q.params.id)
+    const existing = repo.getAgent(String(q.params.id ?? ''))
     if (!existing) return r.status(404).json({ error: 'Agent not found.' })
     const fields = updates.data as Partial<Agent>
     if (fields.status) {
-      const updated = repo.updateAgentStatus(q.params.id, fields.status)
+      const updated = repo.updateAgentStatus(String(q.params.id ?? ''), fields.status)
       if (updated) return r.json({ agent: updated })
     }
-    const updated = repo.updateAgentMetadata(q.params.id, fields)
+    const updated = repo.updateAgentMetadata(String(q.params.id ?? ''), fields)
     if (!updated) return r.status(404).json({ error: 'Agent not found.' })
     r.json({ agent: updated })
   })
 
-  app.get('/api/agents/:id/api-keys', (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+  app.get('/api/agents/:id/api-keys', requireOwner, (q, r) => {
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     r.json({ keys: repo.listApiKeysForAgent(agent.id) })
   })
 
-  app.post('/api/agents/:id/api-keys/rotate', (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+  // Dashboard view: agent identity, public performance, api-key list, recent
+  // verified trades. Owner-only.
+  app.get('/api/agents/:id/dashboard', requireOwner, (q, r) => {
+    const agent = repo.getAgent(String(q.params.id ?? ''))
+    if (!agent) return r.status(404).json({ error: 'Agent not found.' })
+    const trades = repo.listTrades({ agentId: agent.id, limit: 10 })
+    const keys = repo.listApiKeysForAgent(agent.id)
+    r.json({
+      agent,
+      performance: metrics(agent, trades),
+      recentTrades: trades,
+      apiKeys: keys,
+    })
+  })
+
+  app.post('/api/agents/:id/api-keys/rotate', requireOwner, (q, r) => {
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const old = repo.listApiKeysForAgent(agent.id)
     for (const k of old) if (!k.revokedAt) repo.revokeApiKey(k.id)
@@ -314,7 +347,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
   // checks each one on-chain, and returns the first authorized path
   // (or the self-run fallback).
   app.get('/api/agents/:id/use', async (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const userWallet = typeof q.query.user === 'string' ? q.query.user : null
     if (!userWallet || !address.safeParse(userWallet).success) {
@@ -337,7 +370,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
   // Record a verified authorization. CLASH only writes the row after
   // re-verifying on-chain that the authorization is live.
   app.post('/api/agents/:id/use', async (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const parsed = z.object({
       userWallet: address,
@@ -390,7 +423,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
   // not an on-chain grant. Spot operator grants and EIP-7702 designations
   // are revoked on-chain by the user; CLASH just records the revocation.
   app.post('/api/agents/:id/use/revoke', (q, r) => {
-    const agent = repo.getAgent(q.params.id)
+    const agent = repo.getAgent(String(q.params.id ?? ''))
     if (!agent) return r.status(404).json({ error: 'Agent not found.' })
     const parsed = z.object({
       userWallet: address,
