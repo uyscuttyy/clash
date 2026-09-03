@@ -1,9 +1,9 @@
-import { type Agent, type Trade, type AgentPerformance } from './domain'
+import { type Agent, type Trade, type AgentPerformance, type Follow, type MirrorAttempt } from './domain'
 
 // Re-export the domain types so the rest of the app can import from the
 // store barrel. The store is intentionally tiny: the marketplace is mostly
 // a read surface, and the React Query / fetch state lives in the components.
-export type { Agent, Trade, AgentPerformance, DelegationMethod, DelegationMetadata } from './domain'
+export type { Agent, Trade, AgentPerformance, DelegationMethod, DelegationMetadata, Follow, MirrorAttempt } from './domain'
 export { rankAgents, metrics } from './domain'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -183,4 +183,91 @@ export async function rotateApiKey(agentId: string, ownerWallet: `0x${string}`) 
     throw new Error(body.error ?? `Failed to rotate key: HTTP ${res.status}`)
   }
   return res.json() as Promise<{ apiKey: string; apiKeyNote: string }>
+}
+
+// ─── Copy-trading follows ──────────────────────────────────────────────
+//
+// Helpers for the "Use Agent" page and the /me/mirrors dashboard.
+// All write operations require a `X-Follower-Wallet` header; reads too.
+// The body of every follow create/patch carries an EIP-712 signature
+// over the FollowIntent, and the server re-verifies on the way in.
+
+export async function fetchFollowNonce(): Promise<{ nonce: `0x${string}` }> {
+  const res = await fetch('/api/follows/nonce', { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to fetch nonce: HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function createFollow(agentId: string, follower: `0x${string}`, body: {
+  sizeMultiplier: number
+  maxPerTradeRaw: string
+  maxDailyExposureRaw: string
+  maxDailyTrades: number
+  signedIntent: `0x${string}`
+  intentNonce: `0x${string}`
+  expiresAt: number
+}) {
+  const res = await fetch(`/api/agents/${agentId}/follow`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'X-Follower-Wallet': follower },
+    body: JSON.stringify({ followerAddress: follower, ...body }),
+  })
+  const json = await res.json().catch(() => ({})) as { error?: string; follow?: Follow }
+  if (!res.ok) throw new Error(json.error ?? `Failed to create follow: HTTP ${res.status}`)
+  return { follow: json.follow as Follow }
+}
+
+export async function fetchFollow(agentId: string, follower: `0x${string}`): Promise<{ follow: Follow | null; stats: { exposureRaw: string; count: number } }> {
+  const res = await fetch(`/api/agents/${agentId}/follow`, { headers: { 'X-Follower-Wallet': follower } })
+  if (!res.ok) throw new Error(`Failed to load follow: HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function updateFollowStatus(agentId: string, follower: `0x${string}`, status: 'active' | 'paused') {
+  const res = await fetch(`/api/agents/${agentId}/follow`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', 'X-Follower-Wallet': follower },
+    body: JSON.stringify({ followerAddress: follower, status }),
+  })
+  const json = await res.json().catch(() => ({})) as { error?: string; follow?: Follow }
+  if (!res.ok) throw new Error(json.error ?? `Failed to update follow: HTTP ${res.status}`)
+  return { follow: json.follow as Follow }
+}
+
+export async function killFollow(agentId: string, follower: `0x${string}`) {
+  const res = await fetch(`/api/agents/${agentId}/follow`, {
+    method: 'DELETE',
+    headers: { 'X-Follower-Wallet': follower },
+  })
+  const json = await res.json().catch(() => ({})) as { error?: string; follow?: Follow }
+  if (!res.ok) throw new Error(json.error ?? `Failed to kill follow: HTTP ${res.status}`)
+  return { follow: json.follow as Follow }
+}
+
+export async function listMyFollows(follower: `0x${string}`): Promise<{ follows: Array<{ follow: Follow; agent: { id: string; name: string; builder: string } | null; dailyStats: { exposureRaw: string; count: number } }>; count: number }> {
+  const res = await fetch('/api/me/follows', { headers: { 'X-Follower-Wallet': follower } })
+  if (!res.ok) throw new Error(`Failed to load follows: HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function listMyMirrorAttempts(follower: `0x${string}`, opts: { followId?: string; decision?: 'pending' | 'broadcast' | 'confirmed' | 'failed' | 'rejected'; limit?: number } = {}): Promise<{ attempts: MirrorAttempt[]; count: number }> {
+  const qs = new URLSearchParams()
+  if (opts.followId) qs.set('followId', opts.followId)
+  if (opts.decision) qs.set('decision', opts.decision)
+  if (opts.limit) qs.set('limit', String(opts.limit))
+  const url = `/api/me/mirror-attempts${qs.size > 0 ? '?' + qs.toString() : ''}`
+  const res = await fetch(url, { headers: { 'X-Follower-Wallet': follower } })
+  if (!res.ok) throw new Error(`Failed to load mirror attempts: HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function ackMirrorAttempt(attemptId: string, follower: `0x${string}`, body: { decision: 'confirmed' | 'failed' | 'rejected'; mirrorTxHash?: `0x${string}`; reason?: string }) {
+  const res = await fetch(`/api/me/mirror-attempts/${attemptId}/ack`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'X-Follower-Wallet': follower },
+    body: JSON.stringify({ followerAddress: follower, ...body }),
+  })
+  const json = await res.json().catch(() => ({})) as { error?: string; attempt?: MirrorAttempt }
+  if (!res.ok) throw new Error(json.error ?? `Failed to ack mirror attempt: HTTP ${res.status}`)
+  return { attempt: json.attempt as MirrorAttempt }
 }

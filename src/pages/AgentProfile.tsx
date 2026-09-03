@@ -30,7 +30,10 @@ function ProfileBody({ agent: a, performance: p, trades }: { agent: Agent; perfo
             <p className="profile-markets">{a.markets.join(' / ')} · {a.windows.join(' / ')}</p>
           </div>
         </div>
-        <Link className="button" to={`/agents/${a.id}/use`}>Use Agent <ArrowRight /></Link>
+        <div className="profile-cta">
+          <Link className="button primary" to={`/agents/${a.id}/follow`}>Mirror this agent <ArrowRight /></Link>
+          <Link className="button" to={`/agents/${a.id}/use`}>Use Agent</Link>
+        </div>
       </div>
       <p className="lead">{a.description}</p>
 

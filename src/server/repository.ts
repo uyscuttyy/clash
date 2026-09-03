@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { type Agent, type Trade, type AuthorizationRecord } from '../domain'
+import { type Agent, type Trade, type AuthorizationRecord, type Follow, type MirrorAttempt } from '../domain'
 
 // The CLASH marketplace database. The schema is small and deliberate:
 //   - `agents`         — public registry of every agent the marketplace knows about
@@ -92,6 +92,53 @@ export class Repository {
       );
       CREATE INDEX IF NOT EXISTS authorizations_agent_idx ON authorizations(agent_id);
       CREATE INDEX IF NOT EXISTS authorizations_user_idx ON authorizations(user_wallet);
+
+      CREATE TABLE IF NOT EXISTS follows (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        follower_address TEXT NOT NULL,
+        size_multiplier REAL NOT NULL,
+        max_per_trade_raw TEXT NOT NULL,
+        max_daily_exposure_raw TEXT NOT NULL,
+        max_daily_trades INTEGER NOT NULL,
+        signed_intent TEXT NOT NULL,
+        intent_nonce TEXT NOT NULL,
+        signed_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        paused_at TEXT,
+        killed_at TEXT,
+        FOREIGN KEY(agent_id) REFERENCES agents(id),
+        UNIQUE(agent_id, follower_address)
+      );
+      CREATE INDEX IF NOT EXISTS follows_agent_idx ON follows(agent_id);
+      CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows(follower_address);
+      CREATE INDEX IF NOT EXISTS follows_status_idx ON follows(status);
+
+      CREATE TABLE IF NOT EXISTS mirror_attempts (
+        id TEXT PRIMARY KEY,
+        follow_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        follower_address TEXT NOT NULL,
+        source_tx_hash TEXT NOT NULL,
+        source_market_id TEXT NOT NULL,
+        source_pool TEXT NOT NULL,
+        source_side TEXT NOT NULL,
+        source_price_raw TEXT NOT NULL,
+        source_quantity_raw TEXT NOT NULL,
+        decision TEXT NOT NULL DEFAULT 'pending',
+        decision_reason TEXT,
+        mirror_tx_hash TEXT,
+        created_at TEXT NOT NULL,
+        decided_at TEXT,
+        confirmed_at TEXT,
+        FOREIGN KEY(follow_id) REFERENCES follows(id),
+        UNIQUE(source_tx_hash, follower_address)
+      );
+      CREATE INDEX IF NOT EXISTS mirror_attempts_follow_idx ON mirror_attempts(follow_id);
+      CREATE INDEX IF NOT EXISTS mirror_attempts_follower_idx ON mirror_attempts(follower_address);
+      CREATE INDEX IF NOT EXISTS mirror_attempts_decision_idx ON mirror_attempts(decision);
     `)
   }
 
@@ -326,6 +373,258 @@ export class Repository {
       createdAt: r.created_at as string,
     }
   }
+
+  // ─── Follows (copy-trading) ────────────────────────────────────────────
+
+  upsertFollow(follow: Follow): Follow {
+    // The (agent, follower) UNIQUE constraint means "upsert" replaces
+    // the previous follow in place, preserving the follow.id is fine —
+    // we keep the existing id and just refresh the config.
+    const existing = this.db.prepare(
+      'SELECT id FROM follows WHERE agent_id = ? AND follower_address = ?'
+    ).get(follow.agentId, follow.followerAddress.toLowerCase()) as { id: string } | undefined
+    if (existing) {
+      this.db.prepare(`
+        UPDATE follows SET
+          size_multiplier = @sizeMultiplier,
+          max_per_trade_raw = @maxPerTradeRaw,
+          max_daily_exposure_raw = @maxDailyExposureRaw,
+          max_daily_trades = @maxDailyTrades,
+          signed_intent = @signedIntent,
+          intent_nonce = @intentNonce,
+          signed_at = @signedAt,
+          expires_at = @expiresAt,
+          status = @status,
+          paused_at = @pausedAt,
+          killed_at = @killedAt
+        WHERE id = @id
+      `).run({
+        id: existing.id,
+        sizeMultiplier: follow.sizeMultiplier,
+        maxPerTradeRaw: follow.maxPerTradeRaw,
+        maxDailyExposureRaw: follow.maxDailyExposureRaw,
+        maxDailyTrades: follow.maxDailyTrades,
+        signedIntent: follow.signedIntent,
+        intentNonce: follow.intentNonce,
+        signedAt: follow.signedAt,
+        expiresAt: follow.expiresAt,
+        status: follow.status,
+        pausedAt: follow.pausedAt,
+        killedAt: follow.killedAt,
+      })
+      return this.getFollow(existing.id)!
+    }
+    this.db.prepare(`
+      INSERT INTO follows(
+        id, agent_id, follower_address, size_multiplier,
+        max_per_trade_raw, max_daily_exposure_raw, max_daily_trades,
+        signed_intent, intent_nonce, signed_at, expires_at, status,
+        created_at, paused_at, killed_at
+      ) VALUES (
+        @id, @agentId, @followerAddress, @sizeMultiplier,
+        @maxPerTradeRaw, @maxDailyExposureRaw, @maxDailyTrades,
+        @signedIntent, @intentNonce, @signedAt, @expiresAt, @status,
+        @createdAt, @pausedAt, @killedAt
+      )
+    `).run({
+      id: follow.id,
+      agentId: follow.agentId,
+      followerAddress: follow.followerAddress.toLowerCase(),
+      sizeMultiplier: follow.sizeMultiplier,
+      maxPerTradeRaw: follow.maxPerTradeRaw,
+      maxDailyExposureRaw: follow.maxDailyExposureRaw,
+      maxDailyTrades: follow.maxDailyTrades,
+      signedIntent: follow.signedIntent,
+      intentNonce: follow.intentNonce,
+      signedAt: follow.signedAt,
+      expiresAt: follow.expiresAt,
+      status: follow.status,
+      createdAt: follow.createdAt,
+      pausedAt: follow.pausedAt,
+      killedAt: follow.killedAt,
+    })
+    return follow
+  }
+
+  getFollow(id: string): Follow | null {
+    const row = this.db.prepare('SELECT * FROM follows WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return row ? this.mapFollow(row) : null
+  }
+
+  getFollowByAgentAndFollower(agentId: string, followerAddress: string): Follow | null {
+    const row = this.db.prepare(
+      'SELECT * FROM follows WHERE agent_id = ? AND follower_address = ?'
+    ).get(agentId, followerAddress.toLowerCase()) as Record<string, unknown> | undefined
+    return row ? this.mapFollow(row) : null
+  }
+
+  listFollowsForFollower(followerAddress: string): Follow[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM follows WHERE follower_address = ? ORDER BY created_at DESC'
+    ).all(followerAddress.toLowerCase()) as Record<string, unknown>[]
+    return rows.map(r => this.mapFollow(r))
+  }
+
+  listActiveFollowsForAgent(agentId: string): Follow[] {
+    const rows = this.db.prepare(
+      `SELECT * FROM follows WHERE agent_id = ? AND status = 'active' AND expires_at > ? ORDER BY created_at`
+    ).all(agentId, new Date().toISOString()) as Record<string, unknown>[]
+    return rows.map(r => this.mapFollow(r))
+  }
+
+  updateFollowStatus(id: string, status: Follow['status']): Follow | null {
+    const now = new Date().toISOString()
+    if (status === 'paused') {
+      this.db.prepare('UPDATE follows SET status = ?, paused_at = ? WHERE id = ?').run(status, now, id)
+    } else if (status === 'killed') {
+      this.db.prepare('UPDATE follows SET status = ?, killed_at = ? WHERE id = ?').run(status, now, id)
+    } else {
+      this.db.prepare('UPDATE follows SET status = ?, paused_at = NULL WHERE id = ?').run(status, id)
+    }
+    return this.getFollow(id)
+  }
+
+  // ─── Mirror attempts ──────────────────────────────────────────────────
+
+  createMirrorAttempt(attempt: MirrorAttempt): MirrorAttempt {
+    // UNIQUE(source_tx_hash, follower_address) — if the runtime already
+    // recorded an attempt for this (source, follower), no-op.
+    const existing = this.db.prepare(
+      'SELECT id FROM mirror_attempts WHERE source_tx_hash = ? AND follower_address = ?'
+    ).get(attempt.sourceTxHash, attempt.followerAddress.toLowerCase()) as { id: string } | undefined
+    if (existing) return this.getMirrorAttempt(existing.id)!
+    this.db.prepare(`
+      INSERT INTO mirror_attempts(
+        id, follow_id, agent_id, follower_address,
+        source_tx_hash, source_market_id, source_pool, source_side,
+        source_price_raw, source_quantity_raw,
+        decision, decision_reason, mirror_tx_hash,
+        created_at, decided_at, confirmed_at
+      ) VALUES (
+        @id, @followId, @agentId, @followerAddress,
+        @sourceTxHash, @sourceMarketId, @sourcePool, @sourceSide,
+        @sourcePriceRaw, @sourceQuantityRaw,
+        @decision, @decisionReason, @mirrorTxHash,
+        @createdAt, @decidedAt, @confirmedAt
+      )
+    `).run({
+      id: attempt.id,
+      followId: attempt.followId,
+      agentId: attempt.agentId,
+      followerAddress: attempt.followerAddress.toLowerCase(),
+      sourceTxHash: attempt.sourceTxHash,
+      sourceMarketId: attempt.sourceMarketId,
+      sourcePool: attempt.sourcePool,
+      sourceSide: attempt.sourceSide,
+      sourcePriceRaw: attempt.sourcePriceRaw,
+      sourceQuantityRaw: attempt.sourceQuantityRaw,
+      decision: attempt.decision,
+      decisionReason: attempt.decisionReason,
+      mirrorTxHash: attempt.mirrorTxHash,
+      createdAt: attempt.createdAt,
+      decidedAt: attempt.decidedAt,
+      confirmedAt: attempt.confirmedAt,
+    })
+    return attempt
+  }
+
+  getMirrorAttempt(id: string): MirrorAttempt | null {
+    const row = this.db.prepare('SELECT * FROM mirror_attempts WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return row ? this.mapMirrorAttempt(row) : null
+  }
+
+  listMirrorAttempts(opts: { followerAddress?: string; followId?: string; decision?: MirrorAttempt['decision']; limit?: number } = {}): MirrorAttempt[] {
+    const where: string[] = []
+    const params: Record<string, unknown> = {}
+    if (opts.followerAddress) { where.push('follower_address = @followerAddress'); params.followerAddress = opts.followerAddress.toLowerCase() }
+    if (opts.followId) { where.push('follow_id = @followId'); params.followId = opts.followId }
+    if (opts.decision) { where.push('decision = @decision'); params.decision = opts.decision }
+    const limit = opts.limit && opts.limit > 0 ? Math.min(opts.limit, 500) : 200
+    const rows = this.db.prepare(
+      `SELECT * FROM mirror_attempts ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT ${limit}`
+    ).all(params) as Record<string, unknown>[]
+    return rows.map(r => this.mapMirrorAttempt(r))
+  }
+
+  // Pending = "broadcast" — runtime has asked the user to sign. Used by
+  // the follower's open tab to know what to do next.
+  listPendingMirrorAttempts(followerAddress: string, limit = 50): MirrorAttempt[] {
+    return this.listMirrorAttempts({ followerAddress, decision: 'broadcast', limit })
+  }
+
+  updateMirrorAttemptDecision(id: string, decision: MirrorAttempt['decision'], reason: string | null): MirrorAttempt | null {
+    const now = new Date().toISOString()
+    this.db.prepare(
+      'UPDATE mirror_attempts SET decision = ?, decision_reason = ?, decided_at = ? WHERE id = ?'
+    ).run(decision, reason, now, id)
+    return this.getMirrorAttempt(id)
+  }
+
+  updateMirrorAttemptConfirmed(id: string, mirrorTxHash: `0x${string}`): MirrorAttempt | null {
+    const now = new Date().toISOString()
+    this.db.prepare(
+      'UPDATE mirror_attempts SET decision = ?, mirror_tx_hash = ?, confirmed_at = ? WHERE id = ?'
+    ).run('confirmed', mirrorTxHash, now, id)
+    return this.getMirrorAttempt(id)
+  }
+
+  // Daily aggregate for cap enforcement. Returns raw tUSDC summed across
+  // confirmed+failed mirror attempts in the last 24h, plus the count.
+  dailyMirrorStats(followId: string): { exposureRaw: string; count: number } {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    // Both source_quantity_raw and source_price_raw are 6dp tUSDC
+    // amounts. Their product is in raw^2 — divide by 10^6 to recover
+    // raw tUSDC exposure (the actual collateral the follower spent).
+    const row = this.db.prepare(`
+      SELECT
+        COALESCE(SUM(CAST(source_quantity_raw AS INTEGER) * CAST(source_price_raw AS INTEGER) / 1000000), 0) AS exposure,
+        COUNT(*) AS n
+      FROM mirror_attempts
+      WHERE follow_id = ? AND created_at >= ? AND decision IN ('broadcast','confirmed','failed')
+    `).get(followId, since) as { exposure: number | bigint; n: number }
+    // bigint SUM is returned as bigint by better-sqlite3. Normalize to string.
+    const exposure = typeof row.exposure === 'bigint' ? row.exposure.toString() : String(row.exposure)
+    return { exposureRaw: exposure, count: row.n }
+  }
+
+  // ─── Mappers ────────────────────────────────────────────────────────────
+
+  private mapFollow = (row: Record<string, unknown>): Follow => ({
+    id: row.id as string,
+    agentId: row.agent_id as string,
+    followerAddress: (row.follower_address as string) as `0x${string}`,
+    sizeMultiplier: Number(row.size_multiplier),
+    maxPerTradeRaw: row.max_per_trade_raw as string,
+    maxDailyExposureRaw: row.max_daily_exposure_raw as string,
+    maxDailyTrades: row.max_daily_trades as number,
+    signedIntent: (row.signed_intent as string) as `0x${string}`,
+    intentNonce: (row.intent_nonce as string) as `0x${string}`,
+    signedAt: row.signed_at as string,
+    expiresAt: row.expires_at as string,
+    status: row.status as Follow['status'],
+    createdAt: row.created_at as string,
+    pausedAt: (row.paused_at as string | null) ?? null,
+    killedAt: (row.killed_at as string | null) ?? null,
+  })
+
+  private mapMirrorAttempt = (row: Record<string, unknown>): MirrorAttempt => ({
+    id: row.id as string,
+    followId: row.follow_id as string,
+    agentId: row.agent_id as string,
+    followerAddress: (row.follower_address as string) as `0x${string}`,
+    sourceTxHash: (row.source_tx_hash as string) as `0x${string}`,
+    sourceMarketId: (row.source_market_id as string) as `0x${string}`,
+    sourcePool: (row.source_pool as string) as `0x${string}`,
+    sourceSide: row.source_side as MirrorAttempt['sourceSide'],
+    sourcePriceRaw: row.source_price_raw as string,
+    sourceQuantityRaw: row.source_quantity_raw as string,
+    decision: row.decision as MirrorAttempt['decision'],
+    decisionReason: (row.decision_reason as string | null) ?? null,
+    mirrorTxHash: (row.mirror_tx_hash as string | null) as `0x${string}` | null,
+    createdAt: row.created_at as string,
+    decidedAt: (row.decided_at as string | null) ?? null,
+    confirmedAt: (row.confirmed_at as string | null) ?? null,
+  })
 
   close(): void { this.db.close() }
 }

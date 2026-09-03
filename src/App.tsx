@@ -7,6 +7,9 @@ import { Rankings } from './pages/Rankings'
 import { Activity } from './pages/Activity'
 import { AgentProfile } from './pages/AgentProfile'
 import { UseAgent } from './pages/UseAgent'
+import { FollowAgent } from './pages/FollowAgent'
+import { MyMirrors } from './pages/MyMirrors'
+import { MirrorWatch } from './MirrorWatch'
 import { Developers } from './pages/Developers'
 import { DeveloperDashboard } from './pages/DeveloperDashboard'
 
@@ -22,6 +25,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             ['Explore', '/explore'],
             ['Rankings', '/rankings'],
             ['Activity', '/activity'],
+            ['Mirrors', '/me/mirrors'],
             ['Developers', '/developers'],
           ].map(([label, href]) => (
             <NavLink
@@ -57,7 +61,10 @@ export default function App() {
           <Route path="/developers/agents/:id" element={<DeveloperDashboard />} />
           <Route path="/agents/:id" element={<AgentProfile />} />
           <Route path="/agents/:id/use" element={<UseAgent />} />
+          <Route path="/agents/:id/follow" element={<FollowAgent />} />
+          <Route path="/me/mirrors" element={<MyMirrors />} />
         </Routes>
+        <MirrorWatch />
       </Layout>
     </BrowserRouter>
   )

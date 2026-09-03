@@ -105,6 +105,67 @@ export interface AuthorizationRecord {
   revokedAt: string | null
 }
 
+// A "follow" is a user's copy-trading configuration for an agent. The user
+// keeps custody at all times; the agent runtime never holds the user's
+// private key. The follow is just a contract: "when this agent places an
+// order, my wallet should be asked to sign an identical-shape order with my
+// own size multiplier and within my caps." The EIP-712 signedIntent binds
+// the user to those caps; the nonce prevents replay; the runtime re-checks
+// the caps on every mirror attempt.
+export interface Follow {
+  id: string
+  agentId: string
+  // The user's wallet. Lowercased on insert; queries must lowercase too.
+  followerAddress: `0x${string}`
+  // What the user agreed to. Numbers are stored as raw tUSDC strings
+  // (6dp) so big-quantity flows don't lose precision; the UI multiplies
+  // by 1e-6 for display.
+  sizeMultiplier: number           // 0.1..10.0; size = agentSize * multiplier
+  maxPerTradeRaw: string           // raw tUSDC, 6dp string bigint
+  maxDailyExposureRaw: string      // raw tUSDC, 6dp string bigint
+  maxDailyTrades: number           // integer 0..1000
+  // The EIP-712 signature the user signed at creation/update. Verified
+  // by the agent runtime on every mirror attempt via viem.verifyTypedData.
+  signedIntent: `0x${string}`
+  intentNonce: `0x${string}`       // bytes32, unique per (agent, follower)
+  // Validity window. After expiresAt, the runtime refuses to mirror.
+  signedAt: string
+  expiresAt: string
+  // 'active' = mirroring in progress; 'paused' = user paused; 'killed' =
+  // user revoked (terminal). Killed follows are kept for history.
+  status: 'active' | 'paused' | 'killed'
+  createdAt: string
+  pausedAt: string | null
+  killedAt: string | null
+}
+
+// A "mirror attempt" is the agent runtime's record of one decision to mirror
+// or not mirror an agent order. Kept for the user's audit trail and for
+// CLASH to render "your mirror history" without re-deriving from the chain.
+export interface MirrorAttempt {
+  id: string
+  followId: string
+  agentId: string
+  followerAddress: `0x${string}`
+  // The agent's order tx we are mirroring. The source of truth for the
+  // shape of the call the user will be asked to sign.
+  sourceTxHash: `0x${string}`
+  sourceMarketId: `0x${string}`
+  sourcePool: `0x${string}`
+  sourceSide: 'BUY_YES' | 'SELL_YES' | 'BUY_NO' | 'SELL_NO'
+  sourcePriceRaw: string           // 6dp string bigint (raw tUSDC per share)
+  sourceQuantityRaw: string        // 6dp string bigint
+  // What the runtime decided for this attempt.
+  decision: 'pending' | 'broadcast' | 'rejected' | 'confirmed' | 'failed'
+  decisionReason: string | null    // null on 'broadcast' or 'pending'; rejection reason otherwise
+  // What the follower's wallet did with the broadcast request.
+  mirrorTxHash: `0x${string}` | null
+  // Audit.
+  createdAt: string
+  decidedAt: string | null
+  confirmedAt: string | null
+}
+
 // Pure functions.
 
 /**
