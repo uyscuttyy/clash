@@ -113,6 +113,8 @@ function RegistrationForm({ ownerAddress, onDone, onCancel }: { ownerAddress: `0
       const walletAddress = String(f.get('walletAddress') ?? '').trim() as `0x${string}`
       if (!/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) throw new Error('Trading wallet address must be a valid EVM address.')
       if (methods.length === 0) throw new Error('Pick at least one delegation method.')
+      const windows = f.getAll('windows') as ('1M' | '5M' | '15M' | '1H')[]
+      if (windows.length === 0) throw new Error('Pick at least one window.')
       if (methods.includes('spot_operator') && !/^0x[0-9a-fA-F]{40}$/.test(spotPoolAddress)) {
         throw new Error('Spot operator grant requires a spot pool address.')
       }
@@ -124,7 +126,7 @@ function RegistrationForm({ ownerAddress, onDone, onCancel }: { ownerAddress: `0
         description: String(f.get('description') ?? '').trim(),
         builder: String(f.get('builder') ?? '').trim(),
         markets: f.getAll('markets') as ('BTC' | 'ETH')[],
-        windows: ['15M'],
+        windows,
         integration: String(f.get('integration') ?? '').trim(),
         walletAddress,
         ownerAddress,
@@ -157,6 +159,13 @@ function RegistrationForm({ ownerAddress, onDone, onCancel }: { ownerAddress: `0
         <legend>Supported markets</legend>
         <label className="check"><input type="checkbox" name="markets" value="BTC" defaultChecked /> BTC</label>
         <label className="check"><input type="checkbox" name="markets" value="ETH" defaultChecked /> ETH</label>
+      </fieldset>
+      <fieldset>
+        <legend>Supported windows</legend>
+        <label className="check"><input type="checkbox" name="windows" value="1M" defaultChecked /> 1M</label>
+        <label className="check"><input type="checkbox" name="windows" value="5M" defaultChecked /> 5M</label>
+        <label className="check"><input type="checkbox" name="windows" value="15M" defaultChecked /> 15M</label>
+        <label className="check"><input type="checkbox" name="windows" value="1H" defaultChecked /> 1H</label>
       </fieldset>
       <label>Agent integration URL<input required name="integration" type="url" placeholder="https://agent.example.com" /></label>
       <label>Trading wallet address<input required name="walletAddress" pattern="0x[0-9a-fA-F]{40}" placeholder="0x..." defaultValue={ownerAddress} /><small>The public address the agent uses to trade on Somnia. Defaults to your connected wallet. Use a separate hot wallet for delegated execution.</small></label>

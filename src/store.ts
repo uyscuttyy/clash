@@ -109,7 +109,7 @@ export async function registerAgent(payload: {
   description: string
   builder: string
   markets: ('BTC' | 'ETH')[]
-  windows: ('15M' | '1H')[]
+  windows: ('1M' | '5M' | '15M' | '1H')[]
   integration: string
   walletAddress: `0x${string}`
   ownerAddress: `0x${string}`
