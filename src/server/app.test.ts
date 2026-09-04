@@ -566,4 +566,34 @@ describe('Follows (copy-trading)', () => {
     expect(poll.status).toBe(200)
     expect(poll.body.attempts.map((a: { id: string }) => a.id)).toEqual([live.body.attempt.id])
   })
+
+  it('lets a follower sign a fresh intent after killing (re-follow revives in place)', async () => {
+    const api = setup()
+    const reg = await api.post('/api/agents').send(registration)
+    const agentId = reg.body.agent.id
+    const followBody = async (caps: { sizeMultiplier: number; maxPerTradeRaw: string; maxDailyExposureRaw: string; maxDailyTrades: number }) => {
+      const sig = await signFollowIntent(agentId, caps)
+      return api.post(`/api/agents/${agentId}/follow`)
+        .set('X-Follower-Wallet', FOLLOWER)
+        .send({
+          followerAddress: FOLLOWER,
+          ...caps,
+          signedIntent: sig.signedIntent,
+          intentNonce: sig.intentNonce,
+          expiresAt: sig.expiresAt,
+        })
+    }
+    const first = await followBody({ sizeMultiplier: 1.0, maxPerTradeRaw: '1000000', maxDailyExposureRaw: '10000000', maxDailyTrades: 5 })
+    expect(first.status).toBe(201)
+    expect(first.body.follow.status).toBe('active')
+    const kill = await api.delete(`/api/agents/${agentId}/follow`).set('X-Follower-Wallet', FOLLOWER)
+    expect(kill.status).toBe(200)
+    // Same follower signs again with different caps — upsert revives the row.
+    const second = await followBody({ sizeMultiplier: 2.0, maxPerTradeRaw: '2000000', maxDailyExposureRaw: '20000000', maxDailyTrades: 10 })
+    expect(second.status).toBe(201)
+    expect(second.body.follow.status).toBe('active')
+    expect(second.body.follow.id).toBe(first.body.follow.id)
+    expect(second.body.follow.sizeMultiplier).toBe(2.0)
+    expect(second.body.follow.maxDailyTrades).toBe(10)
+  })
 })

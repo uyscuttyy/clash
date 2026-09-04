@@ -180,22 +180,29 @@ export function FollowAgent() {
           ? <WalletPrompt />
           : !isOnSomnia
             ? <NetworkPrompt isSwitching={isSwitching} onSwitch={() => { switchChain({ chainId: somniaShannon.id }) }} />
-            : follow || followLoading
+            : followLoading
               ? <ActiveFollowView
                   a={a} follow={follow} stats={followStats}
                   actionPending={actionPending} actionError={actionError}
                   onPause={onPause} onResume={onResume} onKill={onKill}
                 />
-              : <SetupForm
-                  sizeMultiplier={sizeMultiplier} setSizeMultiplier={setSizeMultiplier}
-                  maxPerTradeT={maxPerTradeT} setMaxPerTradeT={setMaxPerTradeT}
-                  maxDailyExposureT={maxDailyExposureT} setMaxDailyExposureT={setMaxDailyExposureT}
-                  maxDailyTrades={maxDailyTrades} setMaxDailyTrades={setMaxDailyTrades}
-                  acknowledged={acknowledged} setAcknowledged={setAcknowledged}
-                  formValid={formValid}
-                  signing={signing} signError={signError} signSuccess={signSuccess}
-                  onSign={onSignAndCreate}
-                />
+              : follow && follow.status !== 'killed'
+                ? <ActiveFollowView
+                    a={a} follow={follow} stats={followStats}
+                    actionPending={actionPending} actionError={actionError}
+                    onPause={onPause} onResume={onResume} onKill={onKill}
+                  />
+                : <SetupForm
+                    sizeMultiplier={sizeMultiplier} setSizeMultiplier={setSizeMultiplier}
+                    maxPerTradeT={maxPerTradeT} setMaxPerTradeT={setMaxPerTradeT}
+                    maxDailyExposureT={maxDailyExposureT} setMaxDailyExposureT={setMaxDailyExposureT}
+                    maxDailyTrades={maxDailyTrades} setMaxDailyTrades={setMaxDailyTrades}
+                    acknowledged={acknowledged} setAcknowledged={setAcknowledged}
+                    formValid={formValid}
+                    signing={signing} signError={signError} signSuccess={signSuccess}
+                    onSign={onSignAndCreate}
+                    wasKilled={!!follow}
+                  />
         }
       </div>
 
@@ -242,9 +249,18 @@ function SetupForm(props: {
   formValid: boolean
   signing: boolean; signError: string | null; signSuccess: boolean
   onSign: () => void
+  wasKilled: boolean
 }) {
   return (
     <>
+      {props.wasKilled && (
+        <div className="use-step">
+          <div>
+            <h3>Previous follow ended</h3>
+            <p className="muted">You killed the last follow for this agent. Set fresh conditions below and sign a new intent to start mirroring again.</p>
+          </div>
+        </div>
+      )}
       <div className="use-step">
         <span className="use-step-num">2</span>
         <div>
