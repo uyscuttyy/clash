@@ -14,6 +14,7 @@ import {
 import { useAsync } from '../useAsync'
 import { WalletControl } from '../WalletControl'
 import { rawToHuman } from '../eip712'
+import { StatusPill } from '../components'
 
 export function MyMirrors() {
   const { isConnected, address } = useAccount()
@@ -90,27 +91,32 @@ function FollowCard({ follow, agent, dailyStats, follower }: {
   }
 
   const expiresIn = Math.max(0, Math.floor((new Date(follow.expiresAt).getTime() - Date.now()) / 1000 / 3600))
+  const exposure = rawToHuman(dailyStats.exposureRaw)
+  const cap = rawToHuman(follow.maxDailyExposureRaw)
+  const exposurePct = cap > 0 ? Math.min(100, (exposure / cap) * 100) : 0
+  const tradePct = follow.maxDailyTrades > 0 ? Math.min(100, (dailyStats.count / follow.maxDailyTrades) * 100) : 0
 
   return (
-    <div className="follow-card">
-      <div className="follow-card-head">
-        <div>
+    <div className="mirror-row">
+      <div className="mirror-row-head">
+        <div className="agent-card-monogram">{agent?.name?.[0] ?? '?'}</div>
+        <div style={{ flex: 1 }}>
           {agent
-            ? <Link to={`/agents/${agent.id}`} className="follow-card-name">{agent.name}</Link>
+            ? <Link to={`/agents/${agent.id}`} className="follow-card-name"><b>{agent.name}</b></Link>
             : <span className="follow-card-name muted">(agent removed)</span>
           }
-          <span className="muted small"> · {agent?.builder}</span>
+          <span className="muted small"> · {agent?.builder} · {follow.sizeMultiplier.toFixed(1)}× size</span>
         </div>
-        <span className="follow-status" data-status={status}>{status}</span>
+        {status === 'active' && <span className="live-dot" title="This tab is watching for new orders" />}
+        <StatusPill status={status} />
       </div>
-      <div className="follow-card-stats">
-        <div><span>Size</span><b>{follow.sizeMultiplier.toFixed(1)}×</b></div>
-        <div><span>Max / trade</span><b>{rawToHuman(follow.maxPerTradeRaw).toFixed(2)} tUSDC</b></div>
-        <div><span>Max / day</span><b>{rawToHuman(follow.maxDailyExposureRaw).toFixed(2)} tUSDC</b></div>
-        <div><span>Max trades</span><b>{follow.maxDailyTrades}</b></div>
-        <div><span>Today's exposure</span><b>{rawToHuman(dailyStats.exposureRaw).toFixed(2)} tUSDC</b></div>
-        <div><span>Today's trades</span><b>{dailyStats.count}</b></div>
-        <div><span>Expires</span><b>{expiresIn}h</b></div>
+      <div className="micro">TODAY'S EXPOSURE · {exposure.toFixed(2)} / {cap.toFixed(2)} tUSDC</div>
+      <div className="exposure-bar"><i style={{ width: `${exposurePct}%` }} /></div>
+      <div className="micro" style={{ marginTop: 8 }}>TRADES TODAY · {dailyStats.count} / {follow.maxDailyTrades}</div>
+      <div className="exposure-bar"><i style={{ width: `${tradePct}%` }} /></div>
+      <div className="use-card-stats" style={{ marginTop: 12 }}>
+        <span className="metric-mini">Max / trade <b className="num">{rawToHuman(follow.maxPerTradeRaw).toFixed(2)} tUSDC</b></span>
+        <span className="metric-mini">Expires <b>{expiresIn}h</b></span>
       </div>
       {error && <p className="error small">{error}</p>}
       <div className="follow-card-actions">

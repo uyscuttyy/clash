@@ -192,17 +192,29 @@ export function FollowAgent() {
                     actionPending={actionPending} actionError={actionError}
                     onPause={onPause} onResume={onResume} onKill={onKill}
                   />
-                : <SetupForm
-                    sizeMultiplier={sizeMultiplier} setSizeMultiplier={setSizeMultiplier}
-                    maxPerTradeT={maxPerTradeT} setMaxPerTradeT={setMaxPerTradeT}
-                    maxDailyExposureT={maxDailyExposureT} setMaxDailyExposureT={setMaxDailyExposureT}
-                    maxDailyTrades={maxDailyTrades} setMaxDailyTrades={setMaxDailyTrades}
-                    acknowledged={acknowledged} setAcknowledged={setAcknowledged}
-                    formValid={formValid}
-                    signing={signing} signError={signError} signSuccess={signSuccess}
-                    onSign={onSignAndCreate}
-                    wasKilled={!!follow}
-                  />
+                : <div className="quote-grid">
+                    <div>
+                      <SetupForm
+                        sizeMultiplier={sizeMultiplier} setSizeMultiplier={setSizeMultiplier}
+                        maxPerTradeT={maxPerTradeT} setMaxPerTradeT={setMaxPerTradeT}
+                        maxDailyExposureT={maxDailyExposureT} setMaxDailyExposureT={setMaxDailyExposureT}
+                        maxDailyTrades={maxDailyTrades} setMaxDailyTrades={setMaxDailyTrades}
+                        acknowledged={acknowledged} setAcknowledged={setAcknowledged}
+                        formValid={formValid}
+                        signing={signing} signError={signError} signSuccess={signSuccess}
+                        onSign={onSignAndCreate}
+                        wasKilled={!!follow}
+                      />
+                    </div>
+                    <QuoteSummary
+                      agentName={a.name}
+                      sizeMultiplier={sizeMultiplier}
+                      maxPerTradeT={maxPerTradeT}
+                      maxDailyExposureT={maxDailyExposureT}
+                      maxDailyTrades={maxDailyTrades}
+                      formValid={formValid}
+                    />
+                  </div>
         }
       </div>
 
@@ -211,6 +223,27 @@ export function FollowAgent() {
         <p><ExternalLink /> Mirror attempts are recorded on-chain — the same shape as the agent's order, but signed by your wallet from your funds.</p>
       </div>
     </section>
+  )
+}
+
+function QuoteSummary({ agentName, sizeMultiplier, maxPerTradeT, maxDailyExposureT, maxDailyTrades, formValid }: {
+  agentName: string
+  sizeMultiplier: number
+  maxPerTradeT: string
+  maxDailyExposureT: string
+  maxDailyTrades: number
+  formValid: boolean
+}) {
+  return (
+    <aside className="quote-summary" aria-label="Your mirror terms">
+      <span className="micro">YOUR MIRROR TERMS</span>
+      <h3>{agentName} at {Number(sizeMultiplier).toFixed(1)}×</h3>
+      <div className="quote-line"><span>Size</span><b>{Number(sizeMultiplier).toFixed(1)}× agent size</b></div>
+      <div className="quote-line"><span>Max per trade</span><b className="num">{maxPerTradeT} tUSDC</b></div>
+      <div className="quote-line"><span>Max per day</span><b className="num">{maxDailyExposureT} tUSDC</b></div>
+      <div className="quote-line"><span>Max trades / day</span><b className="num">{maxDailyTrades}</b></div>
+      <p className="quote-expiry">{formValid ? 'Intent lasts 24 hours. Your wallet approves every single mirror.' : 'Complete the steps to bind these terms into your signature.'}</p>
+    </aside>
   )
 }
 

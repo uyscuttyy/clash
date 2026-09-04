@@ -22,7 +22,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <nav className={open ? 'open' : ''} aria-label="Primary">
           {[
             ['Home', '/'],
-            ['Explore', '/explore'],
+            ['Agents', '/explore'],
             ['Rankings', '/rankings'],
             ['Activity', '/activity'],
             ['Mirrors', '/me/mirrors'],

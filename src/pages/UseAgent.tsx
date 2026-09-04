@@ -168,6 +168,9 @@ function AuthorizationFlow({
             {s.action === 'confirm' && authState.authorized && !recorded
               ? <button className="button" onClick={() => void onConfirm()} disabled={recording}>{recording ? 'Recording…' : 'I have signed — record on CLASH'}</button>
               : null}
+            {s.href
+              ? <a className="button" style={{ marginTop: 10 }} href={s.href} target="_blank" rel="noopener">{s.hrefLabel ?? 'Open'} <ExternalLink /></a>
+              : null}
             {s.action === 'revoke' && authState.authorized && recorded && authState.path !== 'self_run'
               ? <button className="button warn" onClick={() => void onRevoke()} disabled={recording}>{recording ? 'Revoking…' : 'Revoke authorization'}</button>
               : null}
@@ -191,9 +194,9 @@ function AuthorizationFlow({
   )
 }
 
-interface Step { title: string; body: string; complete: boolean; active: boolean; action?: 'confirm' | 'revoke' }
+interface Step { title: string; body: string; complete: boolean; active: boolean; action?: 'confirm' | 'revoke'; href?: string; hrefLabel?: string }
 
-function buildSteps(_a: Agent, auth: { path: Path; authorized: boolean; reason?: string }): Step[] {
+function buildSteps(a: Agent, auth: { path: Path; authorized: boolean; reason?: string }): Step[] {
   const walletConnected = true
   const verified = auth.authorized
   const recorded = false
@@ -211,11 +214,11 @@ function buildSteps(_a: Agent, auth: { path: Path; authorized: boolean; reason?:
       { title: 'CLASH records the authorization', body: verified ? 'CLASH observed the designation. Click below to record it.' : 'Waiting for the on-chain authorization…', complete: recorded, active: verified && !recorded, action: 'confirm' },
     ]
   }
-  // self_run
+  // self_run — an operator checklist, not a dead end.
   return [
     { title: 'Wallet connected', body: 'Your wallet is connected to Somnia Shannon testnet.', complete: walletConnected, active: !walletConnected },
-    { title: 'Run the agent yourself', body: 'This agent is designed to be run by you, the user. Fund your own wallet, follow the agent\'s instructions, and the agent will trade on your behalf with your private key — never CLASH\'s.', complete: true, active: false },
-    { title: 'Open the agent\'s instructions', body: 'CLASH does not record a marketplace authorization for self-run agents. You remain the operator.', complete: true, active: false },
+    { title: 'Fund your own wallet', body: 'This agent runs with your keys and your funds — never CLASH\u2019s. Keep STT for gas plus the collateral you want to trade with.', complete: true, active: false },
+    { title: 'Open the agent\u2019s instructions', body: 'CLASH does not record a marketplace authorization for self-run agents. You remain the operator.', complete: false, active: true, href: a.integration, hrefLabel: 'Open agent instructions' },
   ]
 }
 
