@@ -24,7 +24,7 @@ const agentRegistration = z.object({
   description: z.string().trim().min(10).max(500),
   builder: z.string().trim().min(2).max(80),
   markets: z.array(z.enum(['BTC', 'ETH'])).min(1),
-  windows: z.array(z.enum(['15M', '1H'])).min(1),
+  windows: z.array(z.enum(['1M', '5M', '15M', '1H'])).min(1),
   integration: z.string().url().max(300),
   walletAddress: address,
   ownerAddress: address,

@@ -1,7 +1,7 @@
 // CLASH domain types. Pure types and pure functions only — no I/O, no SDK imports.
 
 export type Market = 'BTC' | 'ETH'
-export type Window = '15M' | '1H'
+export type Window = '1M' | '5M' | '15M' | '1H'
 export type Direction = 'UP' | 'DOWN'
 export type TradeResult = 'WIN' | 'LOSS'
 
