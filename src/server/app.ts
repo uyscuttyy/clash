@@ -80,6 +80,9 @@ const mirrorAttemptCreate = z.object({
   sourceSide: z.enum(['BUY_YES', 'SELL_YES', 'BUY_NO', 'SELL_NO']),
   sourcePriceRaw: z.string().regex(/^[0-9]{1,30}$/),
   sourceQuantityRaw: z.string().regex(/^[0-9]{1,30}$/),
+  // When the source market closes (ISO). Optional for back-compat with
+  // older runtimes; attempts without it cannot be expiry-filtered.
+  sourceMarketClosesAt: z.string().datetime({ offset: true }).optional(),
 })
 
 const mirrorAttemptAck = z.object({
@@ -478,6 +481,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
           sourceSide: parsed.data.sourceSide,
           sourcePriceRaw: parsed.data.sourcePriceRaw,
           sourceQuantityRaw: parsed.data.sourceQuantityRaw,
+          sourceMarketClosesAt: parsed.data.sourceMarketClosesAt ?? null,
           decision: 'rejected',
           decisionReason: 'Per-trade cap exceeded.',
           mirrorTxHash: null,
@@ -502,6 +506,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
           sourceSide: parsed.data.sourceSide,
           sourcePriceRaw: parsed.data.sourcePriceRaw,
           sourceQuantityRaw: parsed.data.sourceQuantityRaw,
+          sourceMarketClosesAt: parsed.data.sourceMarketClosesAt ?? null,
           decision: 'rejected',
           decisionReason: 'Daily exposure cap would be exceeded.',
           mirrorTxHash: null,
@@ -523,6 +528,7 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
           sourceSide: parsed.data.sourceSide,
           sourcePriceRaw: parsed.data.sourcePriceRaw,
           sourceQuantityRaw: parsed.data.sourceQuantityRaw,
+          sourceMarketClosesAt: parsed.data.sourceMarketClosesAt ?? null,
           decision: 'rejected',
           decisionReason: 'Daily trade count cap reached.',
           mirrorTxHash: null,
@@ -533,6 +539,12 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
         r.status(202).json({ attempt, note: 'Recorded as rejected (daily count).' })
         return
       }
+      // Market-expiry gate: a 1M market can close between the agent's
+      // broadcast and the follower's approval. Record an already-closed
+      // market as rejected so the tab never prompts for an order that
+      // would revert (the wallet cannot estimate gas for it).
+      const marketClosed = !!parsed.data.sourceMarketClosesAt
+        && Date.parse(parsed.data.sourceMarketClosesAt) <= Date.now()
       const attempt = repo.createMirrorAttempt({
         id: randomUUID(),
         followId, agentId: follow.agentId,
@@ -543,8 +555,9 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
         sourceSide: parsed.data.sourceSide,
         sourcePriceRaw: parsed.data.sourcePriceRaw,
         sourceQuantityRaw: parsed.data.sourceQuantityRaw,
-        decision: 'broadcast',
-        decisionReason: null,
+        sourceMarketClosesAt: parsed.data.sourceMarketClosesAt ?? null,
+        decision: marketClosed ? 'rejected' : 'broadcast',
+        decisionReason: marketClosed ? 'Market closed before broadcast.' : null,
         mirrorTxHash: null,
         createdAt: new Date().toISOString(),
         decidedAt: new Date().toISOString(),
@@ -876,6 +889,9 @@ export function createApp(repo: Repository = new Repository(), options: AppOptio
       ? (q.query.decision as MirrorAttempt['decision'])
       : undefined
     const limit = Math.min(Number(q.query.limit ?? 50) || 50, 200)
+    // Expire anything whose market closed before serving the queue, so
+    // the tab never prompts for an order that would revert.
+    repo.expireStaleBroadcasts()
     const attempts = repo.listMirrorAttempts({
       followerAddress: follower, followId, decision, limit,
     })

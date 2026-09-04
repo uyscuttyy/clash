@@ -76,6 +76,11 @@ export function MirrorWatch() {
         const { attempts } = await listMyMirrorAttempts(address as `0x${string}`, { decision: 'broadcast', limit: 10 })
         for (const a of attempts) {
           if (processing.current.has(a.id)) continue
+          // Belt-and-braces: the server sweeps expired markets before
+          // serving the queue, but never prompt for a market that has
+          // closed since (its order would revert and the wallet cannot
+          // estimate gas for it).
+          if (a.sourceMarketClosesAt && Date.parse(a.sourceMarketClosesAt) <= Date.now()) continue
           processing.current.add(a.id)
           processOne(a, address as `0x${string}`, walletClient, exchangeRef.current!)
             .catch(err => console.error('[MirrorWatch] process error', err))

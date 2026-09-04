@@ -140,6 +140,12 @@ export class Repository {
       CREATE INDEX IF NOT EXISTS mirror_attempts_follower_idx ON mirror_attempts(follower_address);
       CREATE INDEX IF NOT EXISTS mirror_attempts_decision_idx ON mirror_attempts(decision);
     `)
+    // Later column: when the source market closes. Idempotent — older
+    // databases lack it, newer ones already have it.
+    const attemptCols = this.db.prepare(`PRAGMA table_info(mirror_attempts)`).all() as { name: string }[]
+    if (!attemptCols.some(c => c.name === 'source_market_closes_at')) {
+      this.db.exec(`ALTER TABLE mirror_attempts ADD COLUMN source_market_closes_at TEXT`)
+    }
   }
 
   // ─── Agents ────────────────────────────────────────────────────────────
@@ -497,13 +503,13 @@ export class Repository {
       INSERT INTO mirror_attempts(
         id, follow_id, agent_id, follower_address,
         source_tx_hash, source_market_id, source_pool, source_side,
-        source_price_raw, source_quantity_raw,
+        source_price_raw, source_quantity_raw, source_market_closes_at,
         decision, decision_reason, mirror_tx_hash,
         created_at, decided_at, confirmed_at
       ) VALUES (
         @id, @followId, @agentId, @followerAddress,
         @sourceTxHash, @sourceMarketId, @sourcePool, @sourceSide,
-        @sourcePriceRaw, @sourceQuantityRaw,
+        @sourcePriceRaw, @sourceQuantityRaw, @sourceMarketClosesAt,
         @decision, @decisionReason, @mirrorTxHash,
         @createdAt, @decidedAt, @confirmedAt
       )
@@ -518,6 +524,7 @@ export class Repository {
       sourceSide: attempt.sourceSide,
       sourcePriceRaw: attempt.sourcePriceRaw,
       sourceQuantityRaw: attempt.sourceQuantityRaw,
+      sourceMarketClosesAt: attempt.sourceMarketClosesAt,
       decision: attempt.decision,
       decisionReason: attempt.decisionReason,
       mirrorTxHash: attempt.mirrorTxHash,
@@ -550,6 +557,18 @@ export class Repository {
   // the follower's open tab to know what to do next.
   listPendingMirrorAttempts(followerAddress: string, limit = 50): MirrorAttempt[] {
     return this.listMirrorAttempts({ followerAddress, decision: 'broadcast', limit })
+  }
+
+  // Market-expiry sweep: a broadcast attempt whose source market has
+  // closed can never be signed (the order reverts, the wallet cannot
+  // estimate gas). Mark it rejected so no dead prompt is ever served.
+  // Called on every poll of the pending queue. Returns rows changed.
+  expireStaleBroadcasts(now = new Date().toISOString()): number {
+    const r = this.db.prepare(
+      `UPDATE mirror_attempts SET decision = 'rejected', decision_reason = 'Market closed before approval.', decided_at = ?
+       WHERE decision = 'broadcast' AND source_market_closes_at IS NOT NULL AND source_market_closes_at <= ?`
+    ).run(now, now)
+    return r.changes
   }
 
   updateMirrorAttemptDecision(id: string, decision: MirrorAttempt['decision'], reason: string | null): MirrorAttempt | null {
@@ -618,6 +637,7 @@ export class Repository {
     sourceSide: row.source_side as MirrorAttempt['sourceSide'],
     sourcePriceRaw: row.source_price_raw as string,
     sourceQuantityRaw: row.source_quantity_raw as string,
+    sourceMarketClosesAt: (row.source_market_closes_at as string | null) ?? null,
     decision: row.decision as MirrorAttempt['decision'],
     decisionReason: (row.decision_reason as string | null) ?? null,
     mirrorTxHash: (row.mirror_tx_hash as string | null) as `0x${string}` | null,

@@ -155,6 +155,10 @@ export interface MirrorAttempt {
   sourceSide: 'BUY_YES' | 'SELL_YES' | 'BUY_NO' | 'SELL_NO'
   sourcePriceRaw: string           // 6dp string bigint (raw tUSDC per share)
   sourceQuantityRaw: string        // 6dp string bigint
+  // When the source market closes (ISO). Prompts past close are never
+  // shown — a closed market's order reverts and the wallet cannot
+  // estimate gas. Null for attempts recorded before this field existed.
+  sourceMarketClosesAt: string | null
   // What the runtime decided for this attempt.
   decision: 'pending' | 'broadcast' | 'rejected' | 'confirmed' | 'failed'
   decisionReason: string | null    // null on 'broadcast' or 'pending'; rejection reason otherwise

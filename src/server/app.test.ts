@@ -512,4 +512,58 @@ describe('Follows (copy-trading)', () => {
     expect(breach.body.attempt.decision).toBe('rejected')
     expect(breach.body.attempt.decisionReason).toMatch(/[Pp]er-trade cap/)
   })
+
+  it('records an already-closed market as rejected and sweeps stale broadcasts on poll', async () => {
+    const api = setup()
+    const reg = await api.post('/api/agents').send(registration)
+    const agentId = reg.body.agent.id
+    const apiKey = reg.body.apiKey
+    const sig = await signFollowIntent(agentId, {
+      sizeMultiplier: 1.0,
+      maxPerTradeRaw: '10000000',
+      maxDailyExposureRaw: '100000000',
+      maxDailyTrades: 50,
+    })
+    const create = await api.post(`/api/agents/${agentId}/follow`)
+      .set('X-Follower-Wallet', FOLLOWER)
+      .send({
+        followerAddress: FOLLOWER,
+        sizeMultiplier: 1.0,
+        maxPerTradeRaw: '10000000',
+        maxDailyExposureRaw: '100000000',
+        maxDailyTrades: 50,
+        signedIntent: sig.signedIntent,
+        intentNonce: sig.intentNonce,
+        expiresAt: sig.expiresAt,
+      })
+    const followId = create.body.follow.id
+    const attemptBody = (tx: string, closesAt?: string) => ({
+      followId,
+      sourceTxHash: '0x' + tx.repeat(64),
+      sourceMarketId: '0x' + 'b'.repeat(64),
+      sourcePool: '0x000000000000000000000000000000000000beef',
+      sourceSide: 'BUY_YES',
+      sourcePriceRaw: '1000000',
+      sourceQuantityRaw: '1000',
+      ...(closesAt ? { sourceMarketClosesAt: closesAt } : {}),
+    })
+    // Live market (closes in 1h) -> broadcast.
+    const live = await api.post(`/api/external/follows/${followId}/mirror-attempts`)
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send(attemptBody('d', new Date(Date.now() + 3600_000).toISOString()))
+    expect(live.status).toBe(201)
+    expect(live.body.attempt.decision).toBe('broadcast')
+    expect(live.body.attempt.sourceMarketClosesAt).toBeTruthy()
+    // Already-closed market -> recorded as rejected, never broadcast.
+    const dead = await api.post(`/api/external/follows/${followId}/mirror-attempts`)
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send(attemptBody('e', new Date(Date.now() - 60_000).toISOString()))
+    expect(dead.body.attempt.decision).toBe('rejected')
+    expect(dead.body.attempt.decisionReason).toMatch(/[Mm]arket closed/)
+    // Polling the queue serves only the live attempt.
+    const poll = await api.get('/api/me/mirror-attempts?decision=broadcast')
+      .set('X-Follower-Wallet', FOLLOWER)
+    expect(poll.status).toBe(200)
+    expect(poll.body.attempts.map((a: { id: string }) => a.id)).toEqual([live.body.attempt.id])
+  })
 })
