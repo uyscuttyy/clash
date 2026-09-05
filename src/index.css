@@ -9,6 +9,7 @@
   --green2: #1A4638;
   --mint: #E6F1EC;
   --soft: #F1F7F4;
+  --stone: #ECE5D8;
   --muted: #6B7A74;
   --line: #E2E8E5;
   --warn: #B33A1F;
@@ -16,6 +17,10 @@
   --neg: #B33A1F;
 }
 * { box-sizing: border-box; }
+:focus-visible { outline: 2px solid var(--green2); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 body { margin: 0; min-width: 320px; }
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font: inherit; }
@@ -61,7 +66,7 @@ nav a.active { color: var(--green); }
 .menu { display: none; margin-left: auto; background: transparent; border: 0; color: var(--green); }
 main { min-height: calc(100vh - 76px - 80px); }
 footer {
-  border-top: 1px solid var(--line); padding: 24px 5vw;
+  border-top: 3px solid var(--stone); padding: 24px 5vw;
   display: flex; gap: 24px; color: var(--muted); font-size: 12px;
 }
 footer b { color: var(--green); } footer .footer-brand { color: var(--green); display: inline-flex; align-items: center; } footer .footer-home { margin-left: auto; color: var(--green); font-weight: 600; } footer .footer-home:hover { color: var(--green2); }
@@ -84,7 +89,7 @@ footer b { color: var(--green); } footer .footer-brand { color: var(--green); di
 .hero {
   min-height: 0; padding: 72px 7vw 56px;
   display: grid; grid-template-columns: 1.4fr 0.6fr; align-items: center; gap: 5vw;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 3px solid var(--stone);
 }
 .hero-text h1 { font-size: clamp(32px, 4.5vw, 54px); font-weight: 600; line-height: 1.06; color: var(--green); margin: 0 0 14px; }
 .hero-text h1 span { color: #7aa28f; }
@@ -107,9 +112,9 @@ footer b { color: var(--green); } footer .footer-brand { color: var(--green); di
   .hero-stats { gap: 18px; flex-wrap: wrap; }
 }
 
-/* Page sections — tighter vertical rhythm */
+/* Page sections — separated by a warm stone band, not a rigid hairline */
 .page { padding: 48px 7vw; }
-.page-section { padding: 48px 7vw; border-top: 1px solid var(--line); }
+.page-section { padding: 48px 7vw; border-top: 3px solid var(--stone); }
 .section-head { margin-bottom: 20px; }
 .section-head h1 { font-size: clamp(30px, 3.6vw, 44px); font-weight: 600; color: var(--green); margin: 4px 0 8px; }
 .section-head h2 { font-size: clamp(24px, 2.8vw, 32px); font-weight: 600; color: var(--green); margin: 4px 0 8px; }
@@ -183,9 +188,10 @@ footer b { color: var(--green); } footer .footer-brand { color: var(--green); di
 }
 
 /* How list */
-/* How list — steps with presence */
+/* How list — steps with presence; cards lift on hover */
 .how-list { list-style: none; counter-reset: how; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.how-list li { counter-increment: how; padding: 20px 18px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.how-list li { counter-increment: how; padding: 20px 18px; border: 1px solid var(--line); border-radius: 12px; background: white; transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease; }
+.how-list li:hover { transform: translateY(-4px); border-color: var(--stone); box-shadow: 0 14px 28px rgba(14, 45, 38, 0.10); }
 .how-list li::before { content: counter(how, decimal-leading-zero); display: block; font: 600 15px var(--display); color: #7aa28f; margin-bottom: 10px; letter-spacing: 0.04em; }
 .how-list b { display: block; font: 600 19px var(--display); color: var(--green); margin-bottom: 6px; letter-spacing: -0.01em; }
 .how-list p { color: var(--green2); font-size: 15px; font-weight: 500; line-height: 1.55; }
@@ -251,7 +257,7 @@ footer b { color: var(--green); } footer .footer-brand { color: var(--green); di
 /* Trade list */
 .profile-section { margin-top: 36px; }
 .trade-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white; }
-.trade-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1.5fr 30px; align-items: center; padding: 12px 18px; background: var(--soft); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.trade-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1.5fr 30px; align-items: center; padding: 12px 18px; background: var(--stone); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green2); font-weight: 700; }
 .trade-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1.5fr 30px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); font-size: 13px; }
 .trade-row:hover { background: var(--soft); }
 .trade-market b { display: block; color: var(--green); }
@@ -370,7 +376,7 @@ nav a.active::after { content: ''; position: absolute; left: 0; right: 0; bottom
 /* Unified data table */
 .dtable { background: white; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
 .dtable-head, .dtable-row { display: grid; align-items: center; gap: 12px; padding: 14px 18px; }
-.dtable-head { background: var(--soft); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.dtable-head { background: var(--stone); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green2); font-weight: 700; }
 .dtable-row { border-top: 1px solid var(--line); font-size: 14px; transition: background 120ms; }
 .dtable-row:first-child { border-top: 0; }
 a.dtable-row:hover { background: var(--soft); }
@@ -453,8 +459,8 @@ a.dtable-row:hover { background: var(--soft); }
 .ctable { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
 .ctable th, .ctable td { padding: 14px 16px; text-align: left; vertical-align: middle; }
 .ctable thead th {
-  background: var(--soft); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--muted); font-weight: 700; white-space: nowrap;
+  background: var(--stone); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--green2); font-weight: 700; white-space: nowrap;
 }
 .ctable tbody tr { border-top: 1px solid var(--line); transition: background 120ms; }
 .ctable tbody tr:first-child { border-top: 0; }
