@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, ChevronRight, ShieldCheck, Sparkles } from 'lucide-react'
-import { fetchActivity, fetchAgents, formatPnl, formatPercent, formatUtcStamp, type AgentPerformance, type Agent } from '../store'
+import { fetchActivity, fetchAgents, formatPnl, formatUtcStamp } from '../store'
 import { useAsync } from '../useAsync'
 
 interface MarketData {
-  agents: Agent[]
-  ranked: AgentPerformance[]
+  agents: unknown[]
+  ranked: unknown[]
   count: number
 }
 
@@ -17,7 +17,6 @@ interface ActivityData {
 export function Home() {
   const agentsQ = useAsync<MarketData>(() => fetchAgents(), [])
   const activityQ = useAsync<ActivityData>(() => fetchActivity(8), [])
-  const featured = (agentsQ.data?.ranked ?? []).slice(0, 3)
   const recent = activityQ.data?.activity ?? []
 
   return (
@@ -25,10 +24,9 @@ export function Home() {
       <section className="hero">
         <div className="hero-text">
           <p className="eyebrow">THE TRADING-AGENT MARKETPLACE</p>
-          <h1>Find a trading agent worth trusting.</h1>
+          <h1>Trade with proof. Build a reputation.</h1>
           <p className="lead">
-            CLASH discovers autonomous trading agents operating on Somnia / DreamDEX and shows you what they have actually done.
-            Every trade is on-chain. Every number is verifiable. No backtests, no promises.
+            Your agent trades. CLASH keeps the record. Traders choose the agents that perform.
           </p>
           <div className="actions">
             <Link className="button" to="/explore">Explore agents <ArrowRight /></Link>
@@ -46,21 +44,6 @@ export function Home() {
           <div><span>CHOOSE</span><i>03</i></div>
           <div><span>USE</span><i>04</i></div>
         </div>
-      </section>
-
-      <section className="page-section">
-        <div className="section-head">
-          <p className="eyebrow">FEATURED AGENTS</p>
-          <h2>Top verified performance</h2>
-        </div>
-        {agentsQ.loading ? <p className="muted">Loading…</p>
-        : agentsQ.error ? <p className="error">Could not load agents: {agentsQ.error}</p>
-        : featured.length === 0
-          ? <div className="empty"><b>No agents have verified activity yet.</b><p>Developers can register an agent on the Developers page. Verified trades will appear here.</p></div>
-          : <div className="card-grid three">
-              {featured.map(p => <AgentCard key={p.agent.id} performance={p} />)}
-            </div>
-        }
       </section>
 
       <section className="page-section">
@@ -111,30 +94,5 @@ export function Home() {
         <Link className="button" to="/developers">Open developer portal <ArrowRight /></Link>
       </section>
     </>
-  )
-}
-
-function AgentCard({ performance: p }: { performance: AgentPerformance }) {
-  const a: Agent = p.agent
-  return (
-    <Link to={`/agents/${a.id}`} className="agent-card">
-      <div className="agent-card-top">
-        <div className="agent-card-monogram">{a.name[0]}</div>
-        <div className="agent-card-id">
-          <h3>{a.name}</h3>
-          <p>{a.builder} · {a.markets.join(' / ')}</p>
-        </div>
-        <ChevronRight />
-      </div>
-      <div className="agent-card-stats">
-        <div><b className={p.pnl > 0 ? 'pnl-pos' : p.pnl < 0 ? 'pnl-neg' : 'pnl-zero'}>{formatPnl(p.pnl)}</b><small>REALIZED PNL</small></div>
-        <div><b>{formatPercent(p.winRate)}</b><small>WIN RATE</small></div>
-        <div><b>{p.trades}</b><small>TRADES</small></div>
-        <div><b className="pnl-neg">{formatPnl(-p.drawdown)}</b><small>MAX DRAWDOWN</small></div>
-      </div>
-      <div className="agent-card-foot">
-        <span className="verified-badge"><Check /> Verified on Somnia</span>
-      </div>
-    </Link>
   )
 }

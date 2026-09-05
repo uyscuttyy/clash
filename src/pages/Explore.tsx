@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Check, ChevronRight } from 'lucide-react'
 import { fetchAgents, formatPnl, formatPercent, type AgentPerformance } from '../store'
 import { useAsync } from '../useAsync'
@@ -17,6 +17,7 @@ const SORTS: Array<{ key: SortKey; label: string }> = [
 export function Explore() {
   const [market, setMarket] = useState<'' | 'BTC' | 'ETH'>('')
   const [sort, setSort] = useState<SortKey>('pnl')
+  const navigate = useNavigate()
   const { data, loading, error } = useAsync(() => fetchAgents({ market: market || undefined }), [market])
   const list = [...(data?.ranked ?? [])].sort((a, b) => {
     if (sort === 'pnl') return b.pnl - a.pnl
@@ -59,11 +60,34 @@ export function Explore() {
             <b>No agents match this filter.</b>
             <p>Try a different market, or register your own agent from the developer portal.</p>
           </div>
-        : <div className="dtable" style={{ gridTemplateColumns: '1fr' }}>
-            <div className="dtable-head" style={{ gridTemplateColumns: '44px 1.6fr 1fr 1fr 1fr 1fr auto 24px' }}>
-              <span>#</span><span>Agent</span><span>Realized PnL</span><span>Win rate</span><span>Trades</span><span>Max DD</span><span>Status</span><span />
-            </div>
-            {list.map((p, i) => <ExploreRow key={p.agent.id} rank={i + 1} performance={p} />)}
+        : <div className="ctable-wrap">
+            <table className="ctable">
+              <colgroup>
+                <col style={{ width: 56 }} />
+                <col />
+                <col style={{ width: 130 }} />
+                <col className="hide-mobile" style={{ width: 110 }} />
+                <col className="hide-mobile" style={{ width: 90 }} />
+                <col className="hide-mobile" style={{ width: 120 }} />
+                <col style={{ width: 150 }} />
+                <col style={{ width: 36 }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Agent</th>
+                  <th className="num-col">Realized PnL</th>
+                  <th className="num-col hide-mobile">Win rate</th>
+                  <th className="num-col hide-mobile">Trades</th>
+                  <th className="num-col hide-mobile">Max DD</th>
+                  <th>Status</th>
+                  <th><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Open</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((p, i) => <ExploreRow key={p.agent.id} rank={i + 1} performance={p} onOpen={() => navigate(`/agents/${p.agent.id}`)} />)}
+              </tbody>
+            </table>
           </div>
       }
     </section>
@@ -79,25 +103,21 @@ function strategyName(builder: string, description: string): string {
   return builder || 'Systematic'
 }
 
-function ExploreRow({ rank, performance: p }: { rank: number; performance: AgentPerformance }) {
+function ExploreRow({ rank, performance: p, onOpen }: { rank: number; performance: AgentPerformance; onOpen: () => void }) {
   const a = p.agent
   return (
-    <Link
-      to={`/agents/${a.id}`}
-      className="dtable-row"
-      style={{ gridTemplateColumns: '44px 1.6fr 1fr 1fr 1fr 1fr auto 24px' }}
-    >
-      <span className="dtable-rank">{String(rank).padStart(2, '0')}</span>
-      <span className="dtable-name">
+    <tr className="clickable" onClick={onOpen}>
+      <td className="rank-cell">{String(rank).padStart(2, '0')}</td>
+      <td className="name-cell">
         <b>{a.name}</b>
         <small>{strategyName(a.builder, a.description)} · {a.markets.join(' / ')}</small>
-      </span>
-      <span className={`num ${p.pnl > 0 ? 'pnl-pos' : p.pnl < 0 ? 'pnl-neg' : 'pnl-zero'}`}>{formatPnl(p.pnl)}</span>
-      <span className="num hide-mobile">{formatPercent(p.winRate)}</span>
-      <span className="num hide-mobile">{p.trades}</span>
-      <span className="num pnl-neg hide-mobile">{formatPnl(-p.drawdown)}</span>
-      <span><StatusPill status={a.status} /> <span className="verified-badge" style={{ marginLeft: 6 }}><Check /> Verified</span></span>
-      <ChevronRight />
-    </Link>
+      </td>
+      <td className={`num-col ${p.pnl > 0 ? 'pnl-pos' : p.pnl < 0 ? 'pnl-neg' : 'pnl-zero'}`}>{formatPnl(p.pnl)}</td>
+      <td className="num-col hide-mobile">{formatPercent(p.winRate)}</td>
+      <td className="num-col hide-mobile">{p.trades}</td>
+      <td className="num-col pnl-neg hide-mobile">{formatPnl(-p.drawdown)}</td>
+      <td><StatusPill status={a.status} /> <span className="verified-badge" style={{ marginLeft: 6 }}><Check /> Verified</span></td>
+      <td><ChevronRight className="row-chevron" /></td>
+    </tr>
   )
 }
