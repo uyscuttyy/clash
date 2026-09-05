@@ -30,7 +30,7 @@ export function MyMirrors() {
         <div className="empty">
           <b>Connect your wallet</b>
           <p>CLASH only knows about follows that your wallet signed. Connect to see them.</p>
-          <div className="use-wallet-row"><WalletControl /></div>
+          <div className="empty-action"><WalletControl /></div>
         </div>
       </section>
     )

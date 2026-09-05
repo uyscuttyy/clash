@@ -1,7 +1,7 @@
 /* CLASH marketplace — design tokens */
 :root {
-  --display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
-  --body: 'Inter', 'DM Sans', system-ui, sans-serif;
+  --display: 'Figtree', 'DM Sans', system-ui, sans-serif;
+  --body: 'Figtree', 'DM Sans', system-ui, sans-serif;
   font-family: var(--body);
   color: #0E1A14;
   background: #FAFAF7;
